@@ -846,7 +846,6 @@ config USB_G_PRINTER
 config USB_ANDROID
 	boolean "Android Gadget"
 	depends on SWITCH
-	default y
 	help
 	  The Android gadget driver supports multiple USB functions.
 	  The functions can be configured via a board file and may be
@@ -1073,7 +1072,6 @@ config USB_G_WEBCAM
 
 config USB_QCOM_MAEMO
         tristate "Qcom gadget compositon for Maemo"
-        default n
 	select MODEM_SUPPORT
 	select USB_CSW_HACK
 	help
@@ -1106,8 +1104,7 @@ config RMNET_SMD_DATA_CHANNEL
           Data SMD channel for transferring network data
 
 config USB_SAMSUNG_DRIVER
-		string "Samsung USB driver support"
-		default y
+        string "Samsung USB driver support"
 		
 endchoice
 
