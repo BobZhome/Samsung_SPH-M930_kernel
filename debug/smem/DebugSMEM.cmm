@@ -1,0 +1,12 @@
+
+cd smem
+do smemlog.cmm
+
+;os.hidden set path=d:\compile\apps\perl\bin;d:\apps\perl\bin;c:\apps\perl\bin;%path%
+;os.window perl smem_log.pl
+
+
+;os.window "d:/apps/perl/bin/perl.exe" smem_log.pl
+;os.window "d:/compile/apps/perl/bin/perl.exe" smem_log.pl
+os.window "c:/apps/perl/bin/perl.exe" smem_log.pl
+cd ..
