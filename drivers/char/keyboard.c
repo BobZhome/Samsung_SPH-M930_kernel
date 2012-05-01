@@ -1305,7 +1305,7 @@ static void kbd_event(struct input_handle *handle, unsigned int event_type,
 
 	tasklet_schedule(&keyboard_tasklet);
 	
-	#if !defined(CONFIG_MACH_VITAL2)
+	#if !defined(CONFIG_MACH_VITAL2) && !defined (CONFIG_MACH_ROOKIE2) && !defined(CONFIG_MACH_PREVAIL2)
 	do_poke_blanked_console = 1;
 	#endif
 	

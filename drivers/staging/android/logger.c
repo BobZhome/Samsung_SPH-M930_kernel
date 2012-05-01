@@ -697,7 +697,8 @@ ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	if(strncmp(klog_buf, "!@", 2) == 0)
 	{
 		printk("%s\n",klog_buf);
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 		if(strncmp(klog_buf, "!@beginofpreloadClasses()", 25) == 0) {
 			static int first = 1;
 			if(first)

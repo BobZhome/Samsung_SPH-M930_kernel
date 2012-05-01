@@ -123,7 +123,8 @@ static struct pm8058_dbg_device *pmic_dbg_device;
 static struct pm8058_chip *pmic_chip;
 
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 // this is only a temporary workaround to acquire the pm lock 
 // before calling gpio_set_cansleep to reduce the chance of being scheduled 
 // while inside a atomic section

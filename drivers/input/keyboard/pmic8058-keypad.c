@@ -31,7 +31,8 @@
 
 #include <linux/input/pmic8058-keypad.h>
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2  || defined CONFIG_MACH_ROOKIE2 || \
+	defined(CONFIG_MACH_PREVAIL2)
 #include <linux/gpio.h>
 #endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -104,13 +105,15 @@
 #define KEYF_FIX_LAST_ROW		0x01
 
 #if defined CONFIG_MACH_CHIEF
+#define TACT_SW_CHATTERING_DISABLED	/* Panasonic Light Touch Switch, EVQP3N01K */
 #define PMIC_GPIO_VOLUME_UPKEY	((system_rev>=5)?PM8058_GPIO(26):PM8058_GPIO(6))  /* PMIC GPIO Number 6 HW Rev 01 */
-#elif defined CONFIG_MACH_VITAL2
+#elif defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || defined(CONFIG_MACH_PREVAIL2)
 #define PMIC_GPIO_VOLUME_UPKEY	PM8058_GPIO(26)
 #define MSM_HALL_IC  ((system_rev>=2)?40:68)
 #endif
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || \
+	defined(CONFIG_MACH_PREVAIL2)
 #define PMIC_GPIO_VOLUME_DOWNKEY	PM8058_GPIO(37)  /* PMIC GPIO Number 6 HW Rev 06 */
 #define PMIC_GPIO_1             	PM8058_GPIO(1)   /* PMIC GPIO Number 1 HW Rev 06 */
 #define PMIC_GPIO_2             	PM8058_GPIO(2)   /* PMIC GPIO Number 2 HW Rev 06 */
@@ -120,7 +123,8 @@
 #endif
 
 /* define GPIO IRQ No. */
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || \
+	defined(CONFIG_MACH_PREVAIL2)
 #define	MSM_GPIO_KEY_VOLUP_IRQ 		PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, (PMIC_GPIO_VOLUME_UPKEY)) 
 #define	MSM_GPIO_KEY_VOLDOWN_IRQ 	PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, (PMIC_GPIO_VOLUME_DOWNKEY))  /* yhkim + L&T prshnt:- for rev06*/
 #endif
@@ -132,7 +136,7 @@ void pmic8058_kp_late_resume(struct early_suspend *h);
 bool is_early_suspend; //for Chief HW rev06 only
 #endif
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || defined(CONFIG_MACH_PREVAIL2)
 static struct hrtimer left_key_timer;
 static struct hrtimer right_key_timer;
 
@@ -325,7 +329,8 @@ static int pmic8058_kp_read_matrix(struct pmic8058_kp *kp, u16 *new_state,
 			(kp->pdata->num_rows != PM8058_MAX_ROWS))
 		read_rows = rows[kp->pdata->num_rows - KEYP_CTRL_SCAN_ROWS_MIN
 					 + 1];
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2  //Qualcomm patch for keypad matrix 2*5 
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2  || \
+	defined(CONFIG_MACH_PREVAIL2)//Qualcomm patch for keypad matrix 2*5 
 	else if (kp->pdata->num_rows < PM8058_MIN_ROWS) 
 		read_rows = PM8058_MIN_ROWS;				
 #endif
@@ -368,14 +373,14 @@ static int __pmic8058_kp_scan_matrix(struct pmic8058_kp *kp, u16 *new_state,
 		for (col = 0; col < kp->pdata->num_cols; col++) {
 			if (!(bits_changed & (1 << col)))
 				continue;
-
-			dev_dbg(kp->dev, "key [%d:%d] %s\n", row, col,
-					!(new_state[row] & (1 << col)) ?
-					"pressed" : "released");
+//      Protected the personal information : Google Logchecker issue
+//			dev_dbg(kp->dev, "key [%d:%d] %s\n", row, col,
+//					!(new_state[row] & (1 << col)) ?
+//					"pressed" : "released");
 
 			code = MATRIX_SCAN_CODE(row, col, PM8058_ROW_SHIFT);
 
-			#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 				if((kp->keycodes[code] == KEY_MENU) || (kp->keycodes[code] == KEY_HOME)){
 					if(chattering_key.left && (chattering_key.left_value == 0 ? 0 : kp->keycodes[code] != chattering_key.left_value)){
 						//pressed
@@ -434,16 +439,17 @@ static int __pmic8058_kp_scan_matrix(struct pmic8058_kp *kp, u16 *new_state,
 				input_report_key(kp->input, kp->keycodes[code], !(new_state[row] & (1 << col)));
 				input_sync(kp->input);
 				
-			#else
+#else
 				input_event(kp->input, EV_MSC, MSC_SCAN, code);
 				input_report_key(kp->input, kp->keycodes[code], !(new_state[row] & (1 << col)));
 
 				input_sync(kp->input);
-			#endif
-
-			#ifndef PRODUCT_SHIP
-			printk("key [%d:%d] keycode [%d] %s\n", row, col, kp->keycodes[code], !(new_state[row] & (1 << col)) ?"pressed" : "released");
-			#endif
+#endif
+#if 0  //Fixing Log Checker issues
+#ifndef PRODUCT_SHIP
+//			printk("key [%d:%d] keycode [%d] %s\n", row, col, kp->keycodes[code], !(new_state[row] & (1 << col)) ?"pressed" : "released");
+#endif
+#endif
 		}
 	}
 
@@ -584,7 +590,8 @@ static DEVICE_ATTR(disable_kp, 0664, pmic8058_kp_disable_show,
 
 /*L&T prshnt:- added a code for 1-5 application test*/
 /* TODO:- Need to check-> 'mask' value */
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 int keyshort_test_status;
 static ssize_t keyshort_test(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -595,7 +602,7 @@ static ssize_t keyshort_test(struct device *dev, struct device_attribute *attr, 
 }
 
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 static enum hrtimer_restart left_key_timer_func(struct hrtimer *timer)
 {
 	chattering_key.left=0;
@@ -673,39 +680,58 @@ static irqreturn_t pmic8058_kp_irq(int irq, void *data)
 static irqreturn_t pmic8058_volume_up_irq(int irq, void *data)
 {
     struct pmic8058_kp *kp = data;
-    static int pre_up_key_state = -1;    
+    static int pre_up_key_state = -1;
     int key_state = 1;
     int code;
-    
+
+#ifdef TACT_SW_CHATTERING_DISABLED
+    disable_irq_nosync(irq);
+    msleep(10);
+#endif
+
 #if defined CONFIG_MACH_CHIEF
     if(!gpio_get_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_VOLUME_UPKEY)))
         key_state = 0;
 
-    code = MATRIX_SCAN_CODE(1, 3, PM8058_ROW_SHIFT);          
+    code = MATRIX_SCAN_CODE(1, 3, PM8058_ROW_SHIFT);
+#elif defined(CONFIG_MACH_PREVAIL2)
+    if(!gpio_get_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_VOLUME_UPKEY)))
+        key_state = 0;
+
+    code = MATRIX_SCAN_CODE(0, 2, PM8058_ROW_SHIFT);  
 #elif  defined(CONFIG_MACH_VITAL2)
     if(!gpio_get_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_VOLUME_UPKEY)))
         key_state = 0;
 
-    code = MATRIX_SCAN_CODE(11, 3, PM8058_ROW_SHIFT);              
+    code = MATRIX_SCAN_CODE(11, 3, PM8058_ROW_SHIFT);  
+#elif  defined (CONFIG_MACH_ROOKIE2)
+if(!gpio_get_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_VOLUME_UPKEY)))
+        key_state = 0;
+
+    code = MATRIX_SCAN_CODE(2, 0, PM8058_ROW_SHIFT);  
+
 #endif
 
     if(pre_up_key_state == key_state && pre_up_key_state != -1 && key_state == 0) {
-		key_state = 1;
-		
-		#ifndef PRODUCT_SHIP				
-		printk("%s : Fix key state\n", __func__);
-		#endif
+        key_state = 1;
+#ifndef PRODUCT_SHIP
+        printk("%s : Fix key state\n", __func__);
+#endif
     }
 
     pre_up_key_state = key_state;
 
-    #ifndef PRODUCT_SHIP
-    printk("%s : keycode [%d] %s\n", __func__, kp->keycodes[code], !key_state?"pressed":"released");
-    #endif
-	
+#ifndef PRODUCT_SHIP
+//    printk("%s : keycode [%d] %s\n", __func__, kp->keycodes[code], !key_state?"pressed":"released");
+#endif
+
     input_event(kp->input, EV_MSC, MSC_SCAN, code);
     input_report_key(kp->input, kp->keycodes[code], !key_state);
     input_sync(kp->input);
+
+#ifdef TACT_SW_CHATTERING_DISABLED
+    enable_irq(irq);
+#endif
 
     return IRQ_HANDLED;
 }
@@ -713,43 +739,61 @@ static irqreturn_t pmic8058_volume_up_irq(int irq, void *data)
 static irqreturn_t pmic8058_volume_down_irq(int irq, void *data)
 {
     struct pmic8058_kp *kp = data;
-    static int pre_down_key_state = -1;       
+    static int pre_down_key_state = -1;
     int key_state = 1;
     int code;
-    
+
+#ifdef TACT_SW_CHATTERING_DISABLED
+    disable_irq_nosync(irq);
+    msleep(10);
+#endif
+
 #if defined CONFIG_MACH_CHIEF
     if(!gpio_get_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_VOLUME_DOWNKEY)))
         key_state = 0;
 
-    code = MATRIX_SCAN_CODE(1, 4, PM8058_ROW_SHIFT);         
+    code = MATRIX_SCAN_CODE(1, 4, PM8058_ROW_SHIFT);
+#elif  defined(CONFIG_MACH_PREVAIL2)
+    if(!gpio_get_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_VOLUME_DOWNKEY)))
+        key_state = 0;
+
+    code = MATRIX_SCAN_CODE(0, 3, PM8058_ROW_SHIFT);         
 #elif  defined(CONFIG_MACH_VITAL2)
     if(!gpio_get_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_VOLUME_DOWNKEY)))
         key_state = 0;
 
-    code = MATRIX_SCAN_CODE(11, 4, PM8058_ROW_SHIFT);              
+    code = MATRIX_SCAN_CODE(11, 4, PM8058_ROW_SHIFT);
+#elif   defined (CONFIG_MACH_ROOKIE2)
+    if(!gpio_get_value_cansleep(PM8058_GPIO_PM_TO_SYS(PMIC_GPIO_VOLUME_DOWNKEY)))
+        key_state = 0;
+
+    code = MATRIX_SCAN_CODE(2, 1, PM8058_ROW_SHIFT);
 #endif
 
     if(pre_down_key_state == key_state && pre_down_key_state != -1 && key_state == 0) {
-        key_state = 1;
-				
-        #ifndef PRODUCT_SHIP
-        printk("%s : Fix key state\n", __func__);        
-        #endif
+        key_state = 1;        
+#ifndef PRODUCT_SHIP
+        printk("%s : Fix key state\n", __func__);
+#endif
     }
 
     pre_down_key_state = key_state;
 
-    #ifndef PRODUCT_SHIP	
-    printk("%s : keycode [%d] %s\n", __func__, kp->keycodes[code], !key_state?"pressed":"released");
-    #endif
+#ifndef PRODUCT_SHIP	
+//    printk("%s : keycode [%d] %s\n", __func__, kp->keycodes[code], !key_state?"pressed":"released");
+#endif
     input_event(kp->input, EV_MSC, MSC_SCAN, code);
     input_report_key(kp->input, kp->keycodes[code], !key_state);
     input_sync(kp->input);
 
+#ifdef TACT_SW_CHATTERING_DISABLED
+    enable_irq(irq);
+#endif
+
     return IRQ_HANDLED;
 }
 
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 static irqreturn_t hall_ic_irq(int irq, void *data)
 {
    struct pmic8058_kp *kp = data;
@@ -917,7 +961,8 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 	unsigned short *keycodes;
 	u8 ctrl_val;
 	struct pm8058_chip	*pm_chip;
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2  /*L&T */
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2)  || \
+	defined(CONFIG_MACH_PREVAIL2)/*L&T */
 	struct class *key_class;
        struct device *keypress;
 #endif
@@ -1094,7 +1139,7 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		goto err_gpio_config;
 	}
 
-	#ifdef CONFIG_MACH_VITAL2
+	#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	hrtimer_init(&left_key_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	left_key_timer.function = left_key_timer_func;
 
@@ -1109,9 +1154,10 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
 		goto err_req_sense_irq;
 	}
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	rc = request_threaded_irq( MSM_GPIO_KEY_VOLUP_IRQ , 
-			NULL, pmic8058_volume_up_irq, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING	, "vol_up", kp);
+			NULL, pmic8058_volume_up_irq, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING, "vol_up", kp);
 
 	if (rc < 0) {
 		dev_err(&pdev->dev, "failed to request vol_up irq\n");
@@ -1127,7 +1173,7 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
       }
 #endif	
 
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
     if (system_rev >= 6) {
       gpio_tlmm_config(GPIO_CFG(MSM_HALL_IC, 1, GPIO_CFG_INPUT,
      					GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
@@ -1193,7 +1239,8 @@ static int __devinit pmic8058_kp_probe(struct platform_device *pdev)
  * for 1-5 application 
  *   /sys/devices/virtual/key/key/key 
  */
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	key_class = class_create(THIS_MODULE,"key");
 	if(IS_ERR(key_class)){
 		printk("failed to keyclass\n");
@@ -1220,7 +1267,7 @@ extern int charging_boot;
 		is_early_suspend = true;
 	else
 #endif
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	if(system_rev >= 2 && charging_boot == 0)
 		is_early_suspend = true;
 	else
@@ -1291,7 +1338,7 @@ static int pmic8058_kp_suspend(struct device *dev)
 	{
 		mutex_lock(&kp->mutex);
 		pmic8058_kp_disable(kp);
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 		enable_irq_wake(MSM_GPIO_TO_INT(MSM_HALL_IC)); /* to wakeup in case of sleep */
 #endif
 		if(get_voice_call_status()==1 && kp->volume_key_wake_enabled == 0) {
@@ -1322,7 +1369,7 @@ static int pmic8058_kp_resume(struct device *dev)
 #endif
 	{
 		mutex_lock(&kp->mutex);
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 		disable_irq_wake(MSM_GPIO_TO_INT(MSM_HALL_IC)); /* to match irq pair */
 #endif
 		pmic8058_kp_enable(kp);

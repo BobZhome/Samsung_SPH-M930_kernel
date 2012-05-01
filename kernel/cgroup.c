@@ -2060,7 +2060,7 @@ static int cgroup_file_open(struct inode *inode, struct file *file)
 	if (err)
 		return err;
 
-#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined(CONFIG_MACH_ROOKIE2)
 	if(__d_cft(file->f_dentry) == NULL) {
 		pr_err("[%s] __d_cft(file->f_dentry) == %x", __func__, __d_cft(file->f_dentry));
 		dump_stack();
@@ -2070,7 +2070,7 @@ static int cgroup_file_open(struct inode *inode, struct file *file)
 	
 	cft = __d_cft(file->f_dentry);
 
-#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined(CONFIG_MACH_ROOKIE2)
 	if(cft == NULL) {
 		return -EAGAIN;
 	}

@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  *
  */
+
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/input.h>
@@ -33,9 +34,15 @@
 #include <mach/vreg.h>
 
 #include "mcs7000_download.h"
+#include <linux/i2c/melfas_ts.h>
 
 #define INPUT_INFO_REG 0x10
 #define IRQ_TOUCH_INT   MSM_GPIO_TO_INT(GPIO_TOUCH_INT)
+
+#if defined(CONFIG_MACH_ROOKIE2)
+#define __TOUCH_KEY__
+#define __TOUCH_DEBUG__
+#endif
 
 #define FINGER_NUM	      5 
 
@@ -61,11 +68,19 @@ static u8 fsa9480_device1 = 0x0;
 extern int get_sending_oj_event();
 #endif
 
-#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2)/* ||defined(CONFIG_MACH_PREVAIL2)*/
 #define TSP_TEST_MODE
+#define TSP_SDCARD_UPDATE
+#ifdef TSP_SDCARD_UPDATE
+static bool sdcard_update = false;
+#endif
 #endif
 
+#if defined(CONFIG_MACH_VITAL2)/* || defined(CONFIG_MACH_PREVAIL2)*/
+#define TSP_TA_NOISE
+#endif
 extern struct class *sec_class;
+#define TS_MAX_TOUCH 5
 
 struct input_info {
 	int max_x;
@@ -88,7 +103,13 @@ struct melfas_ts_driver {
 	struct input_info info[FINGER_NUM+1];
 	int suspended;
 	struct early_suspend	early_suspend;
-	
+#ifdef TSP_TA_NOISE	
+	struct tsp_callbacks callbacks;
+	struct melfas_platform_data *pdata;	
+	bool charging_status;
+	bool tsp_status;
+#endif
+
 	#ifdef TSP_TEST_MODE
 	struct mutex lock;
 	touch_screen_driver_t *melfas_test_mode;
@@ -306,13 +327,21 @@ static void melfas_read_version(void)
 	{
 		melfas_ts->hw_rev = buf[0];
 		melfas_ts->fw_ver = buf[1];
-		//printk("%s :HW Ver : 0x%02x, FW Ver : 0x%02x\n", __func__,buf[0],buf[1]);
+//  Protected the personal information : Google logchecker issue
+#ifndef     PRODUCT_SHIP
+		printk("%s :HW Ver : 0x%02x, FW Ver : 0x%02x\n", __func__,melfas_ts->hw_rev,melfas_ts->fw_ver);
+#endif
+//
 	}
 	else
 	{
 		melfas_ts->hw_rev = 0;
 		melfas_ts->fw_ver = 0;
+//  Protected the personal information : Google logchecker issue
+#ifndef     PRODUCT_SHIP
 		printk("%s : Can't find HW Ver, FW ver!\n", __func__);
+#endif
+//
 	}
 }
 
@@ -354,16 +383,16 @@ static void melfas_firmware_download(void)
 	gpio_tlmm_config(GPIO_CFG(GPIO_I2C0_SCL,  0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 	gpio_tlmm_config(GPIO_CFG(GPIO_I2C0_SDA,  0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 	gpio_tlmm_config(GPIO_CFG(GPIO_TOUCH_INT, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-
-	#if 0 //sdcard update
-	ret = mcsdl_download_binary_data_sdcard();
-	#else //binary update
+#ifdef TSP_SDCARD_UPDATE
+	if(sdcard_update)
+	ret = mms100_ISC_download_binary_data();
+	else
+#endif		
 	ret = mcsdl_download_binary_data();
-	#endif
-
-	enable_irq(melfas_ts->client->irq);
-	melfas_read_version();
-	if(ret > 0) {
+		
+	if(ret == 0x0 ) {
+			enable_irq(melfas_ts->client->irq);		
+			melfas_read_version();		
 			if (melfas_ts->hw_rev < 0) {
 				printk(KERN_ERR "i2c_transfer failed\n");
 			}
@@ -377,14 +406,22 @@ static void melfas_firmware_download(void)
 			#endif
 	}
 	else {
-		printk("[TOUCH] Firmware update failed.. RESET!\n");
+		printk("[TOUCH] Firmware update failed.. RESET!\n");		
 		mcsdl_vdd_off();
-		mdelay(500);
+		gpio_direction_output(GPIO_I2C0_SCL, 0);  // TOUCH SCL DIS
+		gpio_direction_output(GPIO_I2C0_SDA, 0);  // TOUCH SDA DIS
+		
+		gpio_direction_output(GPIO_I2C0_SCL, 1);  // TOUCH SCL EN
+		gpio_direction_output(GPIO_I2C0_SDA, 1);  // TOUCH SDA EN	
+		gpio_tlmm_config(GPIO_CFG(GPIO_TOUCH_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);			
 		mcsdl_vdd_on();
-		mdelay(200);
+		msleep(300); 
 
+		enable_irq(melfas_ts->client->irq);
 	}
-
+#ifdef TSP_SDCARD_UPDATE
+	sdcard_update = false;
+#endif
 }
 
 
@@ -485,7 +522,7 @@ static ssize_t firmware_store(
 #ifdef CONFIG_TOUCHSCREEN_MELFAS_FIRMWARE_UPDATE
 
 	if(strncmp(buf, "UPDATE", 6) == 0 || strncmp(buf, "update", 6) == 0) {
-		#if defined(CONFIG_MACH_CHIEF)
+		#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
 		if(system_rev >= 8){
 			melfas_firmware_download();
 			}
@@ -493,6 +530,9 @@ static ssize_t firmware_store(
 			printk("\nFirmware update error :: Check the your devices version.\n");
 		#else //vital2
 			if(system_rev >= 5){
+		#ifdef TSP_SDCARD_UPDATE				
+			sdcard_update = true;
+		#endif
 			melfas_firmware_download();
 			}
 		else
@@ -1293,7 +1333,7 @@ static ssize_t tsp_test_wakeup_store(struct device *dev, struct device_attribute
 
 static DEVICE_ATTR(gpio, S_IRUGO | S_IWUSR, gpio_show, gpio_store);
 static DEVICE_ATTR(registers, S_IRUGO | S_IWUSR, registers_show, registers_store);
-static DEVICE_ATTR(firmware, S_IRUGO | S_IWUSR, firmware_show, firmware_store);
+static DEVICE_ATTR(firmware, S_IRUGO | S_IWUSR | S_IWGRP, firmware_show, firmware_store);
 static DEVICE_ATTR(debug, S_IRUGO | S_IWUSR, debug_show, debug_store);
 
 #ifdef TSP_TEST_MODE
@@ -1367,7 +1407,9 @@ void set_tsp_noise_filter_reg()
 void tsp_reset(void)
 {
 	printk(KERN_DEBUG "for esd %s\n", __func__) ;
-
+#ifdef TSP_TA_NOISE	
+	char	buf[2];	
+#endif
 	mcsdl_vdd_off();
 	gpio_direction_output(GPIO_I2C0_SCL, 0);  // TOUCH SCL DIS
 	gpio_direction_output(GPIO_I2C0_SDA, 0);  // TOUCH SDA DIS
@@ -1376,9 +1418,178 @@ void tsp_reset(void)
     gpio_direction_output(GPIO_I2C0_SDA, 1);  // TOUCH SDA EN	
     mcsdl_vdd_on();
     msleep(300); 
+#ifdef TSP_TA_NOISE
+	buf[0] = 0xAB;
+	buf[1] = melfas_ts->charging_status;
+	melfas_i2c_write(melfas_ts->client, (char *)buf, 2);
+#endif		
 }
+
+#ifdef TSP_TA_NOISE
+static void inform_charger_connection(struct tsp_callbacks *cb, int mode)
+{
+	char buf[2];
+
+	buf[0] = 0xAB;
+	buf[1] = !!mode;
+	melfas_ts->charging_status = !!mode;
+
+	if(melfas_ts->tsp_status){
+		pr_info("[TSP] TA is %sconnected\n", !!mode ? "" : "dis");
+		melfas_i2c_write(melfas_ts->client, (char *)buf, 2);
+	}
+}
+#endif
+
+#if defined(CONFIG_MACH_ROOKIE2)
 static void melfas_work_func(void)
 {
+	int ret = 0, i, j;	
+	uint8_t buf[66];	
+	int read_num = 0, touchType = 0, touchState = 0, fingerID = 0, keyID = 0;
+	unsigned long flags;
+#ifdef __TOUCH_DEBUG__
+	printk("\n *********** work_func *************\n");
+#endif
+	for (i = 0; i < 10; i++)	
+	{	
+		ret = melfas_i2c_read(melfas_ts->client, 0x0F, buf, 1);	
+		if (ret >= 0)		
+		break; // i2c success	
+	}	
+	//spin_lock_irqsave(&melfas_spin_lock, flags);	
+
+	if (ret < 0)	
+	{	
+		printk("[TSP][MMS128][%s] i2c failed : %d\n", __func__, ret);	
+		tsp_reset();
+		return ;	
+	}	
+	else
+	{	
+		read_num = buf[0];	
+	}	
+	if (read_num > 0)
+	{	
+#ifdef __TOUCH_DEBUG__
+		printk("\n ********* read_num: %d   \n",read_num);
+#endif
+		for (i = 0; i < 10; i++)	
+		{	
+			ret = melfas_i2c_read(melfas_ts->client, 0x10, buf, read_num);	
+			if (ret >= 0)			
+			break; // i2c success	
+		}	
+		if (ret < 0)	
+		{		
+				printk("[TSP][MMS128][%s] i2c failed : %d\n", __func__, ret);
+				tsp_reset();
+				return ;	
+		}		
+				else		
+				{		
+					bool touched_src = false;		
+					if (buf[0] == 0x0f)	
+					{		
+						printk("[TSP][MMS128][%s] ESD defense!!  : %d\n", __func__, fingerID);
+						tsp_reset();
+						return;	
+					}	
+				for (i = 0; i < read_num; i = i + 6)	
+				{
+					touchType = (buf[i] >> 5) & 0x03;	
+					touchState = (buf[i] & 0x80);		
+					if (touchType == 1)	//Screen	
+					{
+#ifdef __TOUCH_DEBUG__
+						printk("\n ************ screen touch *********** \n");
+#endif
+						touched_src = true;			
+						fingerID = (buf[i] & 0x0F) - 1;	
+						if ((fingerID > TS_MAX_TOUCH - 1) || (fingerID < 0))		
+						{	
+							printk("[TSP][MMS128][%s] fingerID : %d\n", __func__, fingerID);	
+							tsp_reset();
+							return ;		
+						}	
+						melfas_ts->info[fingerID].x = (uint16_t)(buf[i + 1] & 0x0F) << 8 | buf[i + 2];		
+						melfas_ts->info[fingerID].y = (uint16_t)(buf[i + 1] & 0xF0) << 4 | buf[i + 3];	
+						melfas_ts->info[fingerID].width = buf[i + 4];
+						if (touchState)				
+							melfas_ts->info[fingerID].z = buf[i + 5];	
+						else				
+							melfas_ts->info[fingerID].z = 0;
+//      Protected the personal information : Google Logchecker issue
+//						printk(" \n x: %d \n y: %d \n width: \n z: %d\n",melfas_ts->info[fingerID].x,melfas_ts->info[fingerID].y,melfas_ts->info[fingerID].width,melfas_ts->info[fingerID].z);
+					}
+#ifdef __TOUCH_KEY__		
+					else if (touchType == 2)	//Key			
+					{
+#ifdef __TOUCH_DEBUG__
+						printk("\n ************ keypad  key *********** id = %d\n",(buf[i]&0x0F));
+#endif
+						keyID = (buf[i] & 0x0F);		
+						if (keyID == 0x1)			
+							input_report_key(melfas_ts->input_dev, KEY_MENU, touchState ? 1 : 0);			
+						if (keyID == 0x2)			
+							input_report_key(melfas_ts->input_dev, KEY_HOME, touchState ? 1 : 0);
+						if (keyID == 0x3)			
+							input_report_key(melfas_ts->input_dev, KEY_BACK, touchState ? 1 : 0);			
+						if (keyID == 0x4)			
+							input_report_key(melfas_ts->input_dev, KEY_SEARCH, touchState ? 1 : 0);
+
+#ifdef __TOUCH_KEYLED__		
+					if( !g_check_keyled)			
+					{
+						b_keyledOn = true;	
+					}
+#endif
+#ifdef __TOUCH_DEBUG__				
+					printk(KERN_DEBUG "[TSP][MMS128][%s] keyID: %d, State: %d\n", __func__, keyID, touchState);
+#endif				
+					}
+#endif	//  __TOUCH_KEY__	
+				}			
+
+				if (touched_src)			
+				{	
+					for (j = 0; j < TS_MAX_TOUCH; j ++)	
+					{
+						if (melfas_ts->info[j].z == -1)			
+							continue;		
+						input_report_abs(melfas_ts->input_dev, ABS_MT_TRACKING_ID, j);	
+						input_report_abs(melfas_ts->input_dev, ABS_MT_POSITION_X, melfas_ts->info[j].x);		
+						input_report_abs(melfas_ts->input_dev, ABS_MT_POSITION_Y, melfas_ts->info[j].y);	
+						input_report_abs(melfas_ts->input_dev, ABS_MT_TOUCH_MAJOR, melfas_ts->info[j].z);	
+						input_report_abs(melfas_ts->input_dev, ABS_MT_WIDTH_MAJOR, melfas_ts->info[j].width);		
+						input_mt_sync(melfas_ts->input_dev);
+//      Protected the personal information : Google Logchecker issue
+//#ifdef __TOUCH_DEBUG__				
+//						printk(KERN_DEBUG "[TSP][MMS128][%s] fingerID: %d, State: %d, x: %d, y: %d, z: %d, w: %d\n",
+//						__func__, j, (melfas_ts->info[j].z > 0), melfas_ts->info[j].x, melfas_ts->info[j].y, melfas_ts->info[j].z, melfas_ts->info[j].width);
+//#endif					
+						if (melfas_ts->info[j].z == 0)		
+							melfas_ts->info[j].z = -1;				
+					}
+				}	
+			
+				input_sync(melfas_ts->input_dev);
+#ifdef __TOUCH_KEYLED__	
+					g_check_action = true;
+#endif		
+			}
+			}
+	else
+			{	
+			printk("[TSP][MMS128][%s] : read_num=%d\n",__func__, read_num);
+			}
+
+}
+
+#else
+static void melfas_work_func(void)
+{
+	
 	int i = 0;
 	u8 id = 0;
 	int z = 0;
@@ -1387,9 +1598,15 @@ static void melfas_work_func(void)
 	int x = buf1[2] | ((uint16_t)(buf1[1] & 0x0f) << 8);
 	int y = buf1[3] | (((uint16_t)(buf1[1] & 0xf0) >> 4) << 8);
 
-#if defined(CONFIG_MACH_CHIEF)
+#if defined(CONFIG_MACH_PREVAIL2)	
+	y = y - 260;
+	if (y < 0) 
+		y = y + 520;
+#endif
+
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
         if(system_rev >= 8){
-                z = buf1[5];   //strength
+		z = buf1[5];   //strength
                 width = buf1[4]; // width
         }
         else
@@ -1441,7 +1658,7 @@ static void melfas_work_func(void)
 
 			melfas_ts->info[id].state = touchaction;
         for ( i= 1; i<FINGER_NUM+1; ++i ) {
-#if defined(CONFIG_MACH_CHIEF)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
                 if(system_rev >= 8) {
                         //debugprintk(5,"[TOUCH_MT] x1: %4d, y1: %4d, z1: %4d, finger: %4d,\n", x, y, z, finger);
                         input_report_abs(melfas_ts->input_dev, ABS_MT_POSITION_X, melfas_ts->info[i].x);
@@ -1477,21 +1694,26 @@ static void melfas_work_func(void)
                 input_mt_sync(melfas_ts->input_dev);
         }
 
-#ifndef PRODUCT_SHIP
-#if defined(CONFIG_MACH_CHIEF)
-        if(system_rev >= 8)
-                debugprintk(5,"[TOUCH] x: %4d, y: %4d, z: %4d, f: %4d, w: %4d\n", x, y, z, finger, width);
-        else
-                debugprintk(5,"[TOUCH] x: %4d, y: %4d, z: %4d, finger: %4d,\n", x, y, z, finger);	
-#else
-        if(system_rev >= 4)
-                debugprintk(5,"[TOUCH] x: %4d, y: %4d, z: %4d, f: %4d, w: %4d\n", x, y, z, finger, width);
-        else
-                debugprintk(5,"[TOUCH] x: %4d, y: %4d, z: %4d, finger: %4d,\n", x, y, z, finger);
-#endif
-#endif
+//      Protected the personal information : Google Logchecker issue
+//#if 0   //Fixing Log Checker issues
+//#ifndef PRODUCT_SHIP
+//#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
+//        if(system_rev >= 8)
+//                debugprintk(5,"[TOUCH] x: %4d, y: %4d, z: %4d, f: %4d, w: %4d\n", x, y, z, finger, width);
+//        else
+//                debugprintk(5,"[TOUCH] x: %4d, y: %4d, z: %4d, finger: %4d,\n", x, y, z, finger);	
+//#else
+//        if(system_rev >= 4)
+//                debugprintk(5,"[TOUCH] x: %4d, y: %4d, z: %4d, f: %4d, w: %4d\n", x, y, z, finger, width);
+//        else
+//                debugprintk(5,"[TOUCH] x: %4d, y: %4d, z: %4d, finger: %4d,\n", x, y, z, finger);
+//#endif
+//#endif
+//#endif
         input_sync(melfas_ts->input_dev);
 }
+
+#endif
 
 irqreturn_t melfas_ts_irq_handler(int irq, void *dev_id)
 {
@@ -1513,7 +1735,7 @@ irqreturn_t melfas_ts_irq_handler(int irq, void *dev_id)
   msg[1].len = sizeof(buf1);
   msg[1].buf = buf1;
 
-#if defined(CONFIG_MACH_CHIEF)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
 	if(system_rev >= 8){
 		ret = i2c_transfer(melfas_ts->client->adapter, msg, 2);
 
@@ -1535,6 +1757,8 @@ irqreturn_t melfas_ts_irq_handler(int irq, void *dev_id)
 			melfas_work_func();
 			}
 		}
+#elif defined (CONFIG_MACH_ROOKIE2)
+			melfas_work_func();
 #else //vital2
 	if(system_rev >= 4){
 		ret = i2c_transfer(melfas_ts->client->adapter, msg, 2);
@@ -1567,7 +1791,8 @@ irqreturn_t melfas_ts_irq_handler(int irq, void *dev_id)
   return IRQ_HANDLED;
 }
 
-int melfas_ts_probe(void)
+#if defined(CONFIG_MACH_VITAL2)/* || defined(CONFIG_MACH_PREVAIL2)*/
+int melfas_ts_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	uint16_t max_x=0, max_y=0;
@@ -1585,6 +1810,14 @@ int melfas_ts_probe(void)
 		ret = -ENODEV;
 		goto err_check_functionality_failed;
 	}
+#ifdef TSP_TA_NOISE
+	melfas_ts->pdata = pdev->dev.platform_data;
+
+	melfas_ts->callbacks.inform_charger = inform_charger_connection;
+	if (melfas_ts->pdata->register_cb)
+		melfas_ts->pdata->register_cb(&melfas_ts->callbacks);
+	melfas_ts->tsp_status = true;
+#endif
 
 	melfas_read_version();
 #ifndef PRODUCT_SHIP 
@@ -1597,11 +1830,14 @@ int melfas_ts_probe(void)
 	mdelay(300);
 	mcsdl_vdd_on();
 	
-#if defined(CONFIG_MACH_CHIEF)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
 	if((system_rev >= 8) && (melfas_ts->fw_ver < 0x21))
 		melfas_firmware_download();
+#elif  defined(CONFIG_MACH_ROOKIE2)
+	if((system_rev >= 5) && (melfas_ts->fw_ver < 0x04))
+		melfas_firmware_download(); 
 #else //vital2
-	if((system_rev >= 5) && (melfas_ts->fw_ver != 0x29))
+	if((system_rev >= 5) && ((melfas_ts->hw_rev == 0x98)&&(melfas_ts->fw_ver == 0x29)))
 		melfas_firmware_download(); 
 #endif
 
@@ -1663,7 +1899,7 @@ int melfas_ts_probe(void)
 	}
 
 
-	#if defined(CONFIG_MACH_CHIEF)
+	#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
 		set_tsp_noise_filter_reg();
 	#endif
 
@@ -1693,6 +1929,137 @@ err_check_functionality_failed:
 	return ret;
 
 }
+#else
+int melfas_ts_probe(void)
+{
+	int ret = 0;
+	uint16_t max_x=0, max_y=0;
+	
+#ifndef PRODUCT_SHIP 
+	printk("\n====================================================");
+	printk("\n=======         [TOUCH SCREEN] PROBE       =========");
+	printk("\n====================================================\n");
+#endif
+
+	if (!i2c_check_functionality(melfas_ts->client->adapter, I2C_FUNC_I2C/*I2C_FUNC_SMBUS_BYTE_DATA*/)) {
+		#ifndef PRODUCT_SHIP 
+		printk(KERN_ERR "melfas_ts_probe: need I2C_FUNC_I2C\n");
+		#endif
+		ret = -ENODEV;
+		goto err_check_functionality_failed;
+	}
+
+	melfas_read_version();
+#ifndef PRODUCT_SHIP 
+	printk(KERN_INFO "[TOUCH] Melfas  H/W version: 0x%02x.\n", melfas_ts->hw_rev);
+	printk(KERN_INFO "[TOUCH] Current F/W version: 0x%02x.\n", melfas_ts->fw_ver);
+#endif
+
+	mdelay(100);
+	mcsdl_vdd_off();
+	mdelay(300);
+	mcsdl_vdd_on();
+	
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
+	if((system_rev >= 8) && (melfas_ts->fw_ver < 0x21))
+		melfas_firmware_download();
+#elif  defined(CONFIG_MACH_ROOKIE2)
+	if((system_rev >= 5) && (melfas_ts->fw_ver < 0x04))
+		melfas_firmware_download(); 
+#else //vital2
+	if((system_rev >= 5) && (melfas_ts->fw_ver < 0x29))
+		melfas_firmware_download(); 
+#endif
+
+
+	melfas_read_resolution();
+	max_x = melfas_ts->info[0].max_x ;
+	max_y = melfas_ts->info[0].max_y ;
+
+#ifndef PRODUCT_SHIP 
+	printk("melfas_ts_probe: max_x: %d, max_y: %d\n", max_x, max_y);
+#endif
+
+	melfas_ts->input_dev = input_allocate_device();
+	if (melfas_ts->input_dev == NULL) {
+		ret = -ENOMEM;
+		#ifndef PRODUCT_SHIP
+		printk(KERN_ERR "melfas_ts_probe: Failed to allocate input device\n");
+		#endif
+		goto err_input_dev_alloc_failed;
+	}
+
+	melfas_ts->input_dev->name = "melfas_ts_input";
+
+	set_bit(EV_SYN, melfas_ts->input_dev->evbit);
+	set_bit(EV_KEY, melfas_ts->input_dev->evbit);
+	set_bit(TOUCH_HOME, melfas_ts->input_dev->keybit);
+	set_bit(TOUCH_MENU, melfas_ts->input_dev->keybit);
+	set_bit(TOUCH_BACK, melfas_ts->input_dev->keybit);
+	set_bit(TOUCH_SEARCH, melfas_ts->input_dev->keybit);
+
+	melfas_ts->input_dev->keycode = melfas_ts_tk_keycode;
+	set_bit(BTN_TOUCH, melfas_ts->input_dev->keybit);
+	set_bit(EV_ABS, melfas_ts->input_dev->evbit);
+
+	input_set_abs_params(melfas_ts->input_dev, ABS_MT_POSITION_X,  0, max_x, 0, 0);
+	input_set_abs_params(melfas_ts->input_dev, ABS_MT_POSITION_Y,  0, max_y, 0, 0);
+	input_set_abs_params(melfas_ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
+	input_set_abs_params(melfas_ts->input_dev, ABS_MT_WIDTH_MAJOR, 0, 30, 0, 0);
+	input_set_abs_params(melfas_ts->input_dev, ABS_MT_TRACKING_ID, 0, 4, 0, 0);
+
+	ret = input_register_device(melfas_ts->input_dev);
+	if (ret) {
+		#ifndef PRODUCT_SHIP 
+		printk(KERN_ERR "melfas_ts_probe: Unable to register %s input device\n", melfas_ts->input_dev->name);
+		#endif
+		goto err_input_register_device_failed;
+	}
+
+	melfas_ts->irq = melfas_ts->client->irq;
+	//ret = request_irq(melfas_ts->client->irq, melfas_ts_irq_handler, IRQF_DISABLED, "melfas_ts irq", 0);
+	ret = request_threaded_irq(melfas_ts->client->irq, NULL, melfas_ts_irq_handler,IRQF_ONESHOT,"melfas_ts irq", 0);
+	if(ret == 0) {
+		#ifndef PRODUCT_SHIP 
+		printk(KERN_INFO "melfas_ts_probe: Start touchscreen %s \n", melfas_ts->input_dev->name);
+		#endif
+	}
+	else {
+		printk("request_irq failed\n");
+	}
+
+
+	#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
+		set_tsp_noise_filter_reg();
+	#endif
+
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	melfas_ts->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	melfas_ts->early_suspend.suspend = melfas_ts_early_suspend;
+	melfas_ts->early_suspend.resume = melfas_ts_late_resume;
+	register_early_suspend(&melfas_ts->early_suspend);
+#endif	/* CONFIG_HAS_EARLYSUSPEND */
+
+#ifdef LCD_WAKEUP_PERFORMANCE
+	/* for synchronous ts operations */
+	complete(&ts_completion);
+#endif
+
+	return 0;
+err_misc_register_device_failed:
+err_input_register_device_failed:
+	input_free_device(melfas_ts->input_dev);
+
+err_input_dev_alloc_failed:
+err_detect_failed:
+	kfree(melfas_ts);
+err_alloc_data_failed:
+err_check_functionality_failed:
+	return ret;
+
+}
+#endif
 
 int melfas_ts_remove(struct i2c_client *client)
 {
@@ -1720,9 +2087,10 @@ int melfas_ts_gen_touch_up(void)
                        x = melfas_ts->info[i].x;
                        y = melfas_ts->info[i].y;
                        z = melfas_ts->info[i].z;
-					#ifndef PRODUCT_SHIP 
-                       printk("[TOUCH_GEN] idx (%d) DOWN KEY x: %4d, y: %4d, z: %4d, finger: %4d\n", i, x, y, z,finger);
-					#endif
+//      Protected the personal information : Google Logchecker issue
+//					#ifndef PRODUCT_SHIP 
+//                       printk("[TOUCH_GEN] idx (%d) DOWN KEY x: %4d, y: %4d, z: %4d, finger: %4d\n", i, x, y, z,finger);
+//					#endif
                        input_report_abs(melfas_ts->input_dev, ABS_MT_POSITION_X,  x);
                        input_report_abs(melfas_ts->input_dev, ABS_MT_POSITION_Y,  y);
                        input_report_abs(melfas_ts->input_dev, ABS_MT_TOUCH_MAJOR, z);		
@@ -1738,9 +2106,10 @@ int melfas_ts_gen_touch_up(void)
                         x = melfas_ts->info[j].x;
                         y = melfas_ts->info[j].y;
                         z = 0;
-					#ifndef PRODUCT_SHIP 
-                        printk("[TOUCH_GEN] idx (%d) UP   KEY x: %4d, y: %4d, z: %4d, finger: %4d\n", j, x, y, z,finger);
-					#endif
+//      Protected the personal information : Google Logchecker issue
+//					#ifndef PRODUCT_SHIP 
+//                        printk("[TOUCH_GEN] idx (%d) UP   KEY x: %4d, y: %4d, z: %4d, finger: %4d\n", j, x, y, z,finger);
+//					#endif
                         input_report_abs(melfas_ts->input_dev, ABS_MT_POSITION_X,  x);
                         input_report_abs(melfas_ts->input_dev, ABS_MT_POSITION_Y,  y);
                         input_report_abs(melfas_ts->input_dev, ABS_MT_TOUCH_MAJOR, z);
@@ -1775,21 +2144,34 @@ int melfas_ts_suspend(pm_message_t mesg)
     mcsdl_vdd_off();
     gpio_set_value(GPIO_I2C0_SCL, 0);  // TOUCH SCL DIS
     gpio_set_value(GPIO_I2C0_SDA, 0);  // TOUCH SDA DIS
-
+#ifdef TSP_TA_NOISE
+	melfas_ts->tsp_status = false;
+#endif
     return 0;
 }
 
 #ifdef LCD_WAKEUP_PERFORMANCE
 static void ts_resume_work_func(struct work_struct *ignored)
 {
+#ifdef TSP_TA_NOISE
+	char buf[2];
+#endif
+
     melfas_ts->suspended = false;
+#ifdef TSP_TA_NOISE
+	melfas_ts->tsp_status = true;
+	buf[0] = 0xAB;
+	buf[1] = melfas_ts->charging_status;
+	melfas_i2c_write(melfas_ts->client, (char *)buf, 2);	
+    printk("[TSP]ta status %d in resume\n", melfas_ts->charging_status);
+#endif	
 
 #ifdef TSP_TEST_MODE
     touch_screen.device_state = true; 
 #endif
     enable_irq(melfas_ts->irq);
 
-#if defined(CONFIG_MACH_CHIEF)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
     set_tsp_noise_filter_reg();
 #endif
 
@@ -1820,7 +2202,7 @@ int melfas_ts_resume(void)
 #endif
     enable_irq(melfas_ts->irq);
 
-#if defined(CONFIG_MACH_CHIEF)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_PREVAIL2)
     set_tsp_noise_filter_reg();
 #endif
 #endif

@@ -35,7 +35,7 @@
 /* input device for proximity sensor */
 #define USE_INPUT_DEVICE 	0  /* 0 : No Use  ,  1: Use  */
 
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || defined(CONFIG_MACH_PREVAIL2)
 #define USE_MODE_B // With detection distance hysteresis.
 #endif
 

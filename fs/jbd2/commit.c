@@ -340,7 +340,7 @@ static void write_tag_block(int tag_bytes, journal_block_tag_t *tag,
 		tag->t_blocknr_high = cpu_to_be32((block >> 31) >> 1);
 }
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2)
 #include <linux/delay.h>
 #endif
 
@@ -393,7 +393,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 		jbd_debug(3, "superblock not updated\n");
 	}
 
-#ifdef CONFIG_MACH_VITAL2 // debug code!!
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2)// debug code!!
 	if(journal->j_running_transaction == NULL) {
 		int loop = 0;
 		pr_info("\n@# jbd2 bug!!!! \n");
@@ -402,10 +402,10 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 				msleep(1);
 			else
 				break;
-			if(loop++ > 100)
+			if(loop++ > 200)
 				break;
 		}
-		pr_info("@# %s:%d journal=0x%8x j_running_transaction=0x%8x loop=%d\n", __func__, __LINE__, (int)journal, (int)journal->j_running_transaction, loop);
+                pr_info("@# %s:%d journal=0x%8x j_running_transaction=0x%8x loop=%d\n", __func__, __LINE__, (int)journal, (int)journal->j_running_transaction, loop);
 	}
 #endif
 

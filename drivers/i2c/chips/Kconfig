@@ -20,6 +20,13 @@ config SENSORS_YDA165
 	help
 	 YDA165 Audio AMP	
 
+config SENSORS_YDA173
+	bool "YDA165 Audio Amp Driver"
+	depends on I2C
+	default n
+	help
+	 YDA173 Audio AMP	
+	 
 config SENSORS_MAX9877
 	tristate "MAX9877 Audio Amp Driver"
 	depends on I2C

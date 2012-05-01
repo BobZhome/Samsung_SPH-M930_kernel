@@ -1021,9 +1021,12 @@ static int __init hidp_init(void)
 	int ret;
 
 	l2cap_load();
-
+	
+//  Protected the personal information : Google logchecker issue
+#ifndef     PRODUCT_SHIP
 	BT_INFO("HIDP (Human Interface Emulation) ver %s", VERSION);
-
+#endif
+//
 	ret = hid_register_driver(&hidp_driver);
 	if (ret)
 		goto err;

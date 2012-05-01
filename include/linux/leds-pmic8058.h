@@ -35,7 +35,7 @@ enum pmic8058_leds {
 #ifdef CONFIG_MACH_CHIEF
 	PMIC8058_ID_LED_1, /* blue */
 	PMIC8058_ID_LED_2, /* red */
-#elif CONFIG_MACH_VITAL2
+#elif defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	PMIC8058_ID_LED_2, /* blue */
 	PMIC8058_ID_LED_1, /* red */
 #endif

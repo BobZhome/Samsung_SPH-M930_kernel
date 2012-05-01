@@ -245,15 +245,19 @@ int mmc_add_card(struct mmc_card *card)
 	}
 
 	if (mmc_host_is_spi(card->host)) {
+#ifndef PRODUCT_SHIP
 		printk(KERN_INFO "%s: new %s%s card on SPI\n",
 			mmc_hostname(card->host),
 			mmc_card_highspeed(card) ? "high speed " : "",
 			type);
+#endif
 	} else {
+#ifndef PRODUCT_SHIP
 		printk(KERN_INFO "%s: new %s%s card at address %04x\n",
 			mmc_hostname(card->host),
 			mmc_card_highspeed(card) ? "high speed " : "",
 			type, card->rca);
+#endif
 	}
 
 	ret = device_add(&card->dev);

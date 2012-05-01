@@ -29,13 +29,13 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/crypto.h>
+#include <linux/qcedev.h>
 #include <crypto/hash.h>
 #include <crypto/sha.h>
-
 #include <mach/dma.h>
-#include "inc/qce.h"
-#include "inc/qcedev.h"
-#include "inc/qcryptohw.h"
+
+#include "qce.h"
+#include "qcryptohw.h"
 
 /* ADM definitions */
 #define LI_SG_CMD  (1 << 31)    /* last index in the scatter gather cmd */
@@ -89,7 +89,7 @@ struct qce_device {
 	unsigned int crci_out;	      /* CRCI for CE DM OUT Channel   */
 	unsigned int crci_hash;	      /* CRCI for CE HASH   */
 	unsigned int chan_ce_in;      /* ADM channel used for CE input
-					 * and auth result if authentication
+					* and auth result if authentication
 					* only operation. */
 	unsigned int chan_ce_out;     /* ADM channel used for CE output,
 					and icv for esp */
@@ -1933,7 +1933,7 @@ int qce_close(void *handle)
 
 	kfree(handle);
 	clk_put(pce_dev->ce_clk);
-		return 0;
+	return 0;
 }
 EXPORT_SYMBOL(qce_close);
 

@@ -33,6 +33,17 @@
 //#define CONFIG_LOAD_FILE 
 
 ////////////////////////////////////////
+#ifdef CONFIG_MACH_PREVAIL2
+#define CAM_RESET 130
+#define CAM_STANDBY 131
+#define CAM_EN 3
+#define CAM_EN_2 132
+#define CAM_I2C_SCL 177
+#define CAM_I2C_SDA 174
+#define CAM_VT_nSTBY 2		//yjlee : add
+#define CAM_VT_RST 175		//yjlee : add
+#define CAM_MCLK 15			//yjlee : add
+#else
 #ifdef CONFIG_MACH_CHIEF
 #define CAM_RESET ((system_rev>=6)?161:75)
 #define CAM_STANDBY ((system_rev>=6)?132:74)
@@ -46,7 +57,7 @@
 #define CAM_VT_nSTBY 2		//yjlee : add
 #define CAM_VT_RST 175		//yjlee : add
 #define CAM_MCLK 15			//yjlee : add
-
+#endif
 
 #define PCAM_CONNECT_CHECK		0
 #define PCAM_VT_MODE	        	1
@@ -318,7 +329,9 @@ static long sr130pc10_set_exposure_value(int mode, int exposure)
 			break;
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("<=PCAM=> unexpected Exposure Value %s/%d\n", __func__, __LINE__);
+#endif
 //			return -EINVAL;
                         return 0;
 	}
@@ -358,7 +371,9 @@ static long sr130pc10_set_whitebalance(int mode, int wb)
 			break;
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("<=PCAM=> unexpected WB mode %s/%d\n", __func__, __LINE__);
+#endif
 //			return -EINVAL;
                         return 0;
  	}

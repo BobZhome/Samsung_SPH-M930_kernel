@@ -41,12 +41,24 @@
 //#define CONFIG_LOAD_FILE
 #define I2C_BURST_MODE //dha23 100325 카메라 기동 시간 줄이기 위해 I2C Burst mode 사용.
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 extern struct class *sec_class;
 struct device *flash_dev;
 #endif
 
 ////////////////////////////////////////
+#ifdef CONFIG_MACH_PREVAIL2
+#define CAM_RESET 130
+#define CAM_STANDBY 131
+#define CAM_EN_2 132
+#define CAM_EN 3
+#define CAM_I2C_SCL 30
+#define CAM_I2C_SDA 17
+#define CAM_VT_nSTBY 2
+#define CAM_VT_RST 175
+#define CAM_MCLK 15	
+#else
 #if 1
 #ifdef CONFIG_MACH_CHIEF
 #define CAM_RESET ((system_rev>=6)?161:75)
@@ -63,7 +75,7 @@ struct device *flash_dev;
 #define CAM_VT_RST 175
 #define CAM_MCLK 15	
 #endif
-
+#endif
 #define PMIC_GPIO_CAM_FLASH_SET	PM8058_GPIO(27)
 #define PMIC_GPIO_CAM_FLASH_EN	PM8058_GPIO(28)
 
@@ -293,23 +305,23 @@ void sensor_rough_control(void __user *arg)
 
 		case PCAM_FIXED_FRAME:
                     printk("[S5K5CC] PCAM_FIXED_FRAME\n");   
-#ifdef CONFIG_MACH_VITAL2
-                    msleep(100);
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
+                    msleep(50);
 #endif
                     s5k5cc_sensor_write_list(s5k5cc_30_fps,"s5k5cc_30_fps");
-#ifdef CONFIG_MACH_VITAL2
-                    msleep(100);
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
+                    msleep(150);
 #endif
                     break;
 
 		case PCAM_AUTO_FRAME:
                     printk("[S5K5CC] PCAM_AUTO_FRAME\n");
-#ifdef CONFIG_MACH_VITAL2
-                    msleep(100);
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
+                    msleep(50);
 #endif
                     s5k5cc_sensor_write_list(s5k5cc_fps_nonfix,"s5k5cc_fps_nonfix");
-#ifdef CONFIG_MACH_VITAL2
-                    msleep(100);
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
+                    msleep(150);
 #endif
                     break;
 
@@ -569,7 +581,9 @@ static long s5k5cc_set_brightness(int mode, int brightness)
  			break;
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("<=PCAM=> unexpected brightness %s/%d\n", __func__, __LINE__);
+#endif
 			//return -EINVAL;
 			return 0;
  	}
@@ -607,7 +621,9 @@ static long s5k5cc_set_whitebalance(int mode, int wb)
 			break;
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("<=PCAM=> unexpected WB mode %s/%d\n", __func__, __LINE__);
+#endif
 			//return -EINVAL;
 			return 0;
  	}
@@ -642,7 +658,9 @@ static long s5k5cc_set_exposure_value(int mode, int exposure)
 			break;
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("<=PCAM=> unexpected Exposure Value %s/%d\n", __func__, __LINE__);
+#endif
 			//return -EINVAL;
 			return 0;
 	}
@@ -680,7 +698,9 @@ static long s5k5cc_set_auto_exposure(int mode, int metering)
 			break;
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("<=PCAM=> unexpected Auto exposure %s/%d\n", __func__, __LINE__);
+#endif
 			//return -EINVAL;
 			return 0;
  	}
@@ -768,7 +788,9 @@ static long s5k5cc_set_scene_mode(int mode, int scene)
 
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("<=PCAM=> unexpected scene %s/%d\n", __func__, __LINE__);
+#endif
 			//return -EINVAL;
 			return 0;
  	}
@@ -797,7 +819,9 @@ static long s5k5cc_set_ISO(int mode, int iso)
 			break;
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("<=PCAM=> unexpected ISO value %s/%d\n", __func__, __LINE__);
+#endif
 			//return -EINVAL;
 			return 0;
  	}
@@ -882,7 +906,9 @@ static long s5k5cc_set_flash_mode(int mode, int flash)
 			break;
 
 		default:
+#ifndef PRODUCT_SHIP
 			printk("unexpected Flash value %s/%d\n", __func__, __LINE__);
+#endif
 			//return -EINVAL;
 			return 0;
  	}
@@ -1130,7 +1156,7 @@ static int s5k5cc_sensor_af_control(int type)
 		printk("[CAM-SENSOR] Focus Mode -> release\n"); 
 		af_status = af_stop;
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
                 if(af_mode == 1)
         		s5k5cc_sensor_write_list(s5k5cc_af_macro_off,"s5k5cc_af_macro_off");
                 else
@@ -1233,7 +1259,7 @@ static long s5k5cc_set_sensor_mode(int mode)
                     preflash_on = 0;
                     flash_set_on_snap = 1;
                     s5k5cc_sensor_write_list(S5K5CC_Flash_Start_EVT1,"S5K5CC_Flash_Start_EVT1");
-#ifdef CONFIG_MACH_VITAL2                        
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)                        
                     if(af_mode == 1)
                         s5k5cc_set_flash(MOVIEMODE_FLASH);
                     else
@@ -1824,7 +1850,7 @@ int s5k5cc_sensor_release(void)
 	vreg_disable(vreg_get(NULL, "gp7"));    
 #endif
 	mdelay(1);
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
         if(system_rev>=6)
         {
         	gpio_set_value(CAM_EN_2, 0);
@@ -1889,7 +1915,7 @@ static struct i2c_driver s5k5cc_i2c_driver = {
 	},
 };
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 /* for sysfs control (/sys/class/sec/flash/flash_switch) */
 /* turn on : echo 1 > /sys/class/sec/flash/flash_switch */
 /* turn off : echo 0 > /sys/class/sec/flash/flash_switch */
@@ -1932,7 +1958,7 @@ int s5k5cc_sensor_probe(const struct msm_camera_sensor_info *info,
 	printk("[PGH] s5k5cc_client->adapter->nr : %d\n", s5k5cc_client->adapter->nr);
 
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	flash_dev = device_create(sec_class, NULL, 0, NULL, "flash");
 
 	if (IS_ERR(flash_dev))

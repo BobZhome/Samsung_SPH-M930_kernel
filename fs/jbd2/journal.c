@@ -467,18 +467,29 @@ int __jbd2_log_start_commit(journal_t *journal, tid_t target)
 	/*
 	 * Are we already doing a recent enough commit?
 	 */
-	if (!tid_geq(journal->j_commit_request, target)) {
+	if (journal->j_running_transaction &&
+	    journal->j_running_transaction->t_tid == target) {
 		/*
 		 * We want a new commit: OK, mark the request and wakup the
 		 * commit thread.  We do _not_ do the commit ourselves.
 		 */
-
 		journal->j_commit_request = target;
 		jbd_debug(1, "JBD: requesting commit %d/%d\n",
 			  journal->j_commit_request,
 			  journal->j_commit_sequence);
 		wake_up(&journal->j_wait_commit);
 		return 1;
+	} else if (!tid_geq(journal->j_commit_request, target)) {
+		/* This should never happen, but if it does, preserve
+	           the evidence before kjournald goes into a loop and
+		   increments j_commit_sequence beyond all recognition. */
+		pr_err("jbd2: bad log_start_commit: %u %u %u\n",
+		       journal->j_commit_request, journal->j_commit_sequence,
+		       target);
+		if (journal->j_running_transaction)
+			pr_err("jbd2: current txn: %u\n",
+			       journal->j_running_transaction->t_tid);
+		WARN_ON(1);
 	}
 	return 0;
 }
@@ -507,11 +518,13 @@ int jbd2_journal_force_commit_nested(journal_t *journal)
 {
 	transaction_t *transaction = NULL;
 	tid_t tid;
+	int need_to_start = 0;
 
 	spin_lock(&journal->j_state_lock);
 	if (journal->j_running_transaction && !current->journal_info) {
 		transaction = journal->j_running_transaction;
-		__jbd2_log_start_commit(journal, transaction->t_tid);
+		if (!tid_geq(journal->j_commit_request, transaction->t_tid))
+			need_to_start = 1;
 	} else if (journal->j_committing_transaction)
 		transaction = journal->j_committing_transaction;
 
@@ -522,6 +535,8 @@ int jbd2_journal_force_commit_nested(journal_t *journal)
 
 	tid = transaction->t_tid;
 	spin_unlock(&journal->j_state_lock);
+	if (need_to_start)
+		jbd2_log_start_commit(journal, tid);
 	jbd2_log_wait_commit(journal, tid);
 	return 1;
 }

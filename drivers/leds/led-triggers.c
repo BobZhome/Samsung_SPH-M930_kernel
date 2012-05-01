@@ -113,7 +113,8 @@ void led_trigger_set(struct led_classdev *led_cdev, struct led_trigger *trigger)
 		if (led_cdev->trigger->deactivate)
 			led_cdev->trigger->deactivate(led_cdev);
 		led_cdev->trigger = NULL;
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 		if (!trigger) // Don't turn it off here. let the new trigger control it's led
 #endif
 		led_set_brightness(led_cdev, LED_OFF);

@@ -131,22 +131,22 @@ static int vnet_start_xmit_flag = 0;
 #ifdef LOOP_BACK_TEST
 
 /**********************************************************************
-	loop back test implementation		
+	loop back test implementation
 
 	Usage :
 
 	1. start test
-	
+
 	loopback test can be triggered by setting '/sys/class/misc/multipdp/loopback'
 
 	"
 	# cd /sys/class/misc/multipdp/
 	# echo start > loopback
-	
+
 	2. get stastic result
-	
+
 	it shows some result value for this test)
-	
+
 	"
 	# cat loopback
 
@@ -189,7 +189,7 @@ static ssize_t show_loopback_value(struct device *dev, struct device_attribute *
 			+ (loopback_res.nEndTime.tv_usec - loopback_res.nStartTime.tv_usec)/1000000;
 
 		total_size = loopback_res.nTransfered * loopback_res.nPacketDataSize;
-		
+
 		return sprintf(buf,
 			"\n=====	LoopBack Test Result	=====\n\n"
 			"Transfered Items = %d\n"
@@ -205,7 +205,7 @@ static ssize_t show_loopback_value(struct device *dev, struct device_attribute *
 			nElapsedtime_s,
 			total_size/nElapsedtime_s
 			);
-						
+
 	}
 	else {
 		// show test is not on going.
@@ -228,7 +228,7 @@ static send_loop_back_packet(const char* data, int size)
 		//printk("send loopback packet end [%d]\n",loopback_res.nTransfered);
 		loopback_res.nTransfered++;
 		}
-	
+
 }
 
 static ssize_t store_loopback_value(struct device *dev, struct device_attribute *attr, char * buf, size_t count)
@@ -237,7 +237,7 @@ static ssize_t store_loopback_value(struct device *dev, struct device_attribute 
 
 	// we can send various size of data by setting this value as mutiple of 10
 	int data_size = 1500;
-	
+
 	char temp_str[10] = "0123456789";
 	if ( !strncmp(buf, "start", 5))
 		{
@@ -246,23 +246,23 @@ static ssize_t store_loopback_value(struct device *dev, struct device_attribute 
 		// initialize stastics value
 		loopback_res.nTransfered = 0;
 		loopback_res.nPacketDataSize = data_size;
-		
+
 		// make data
 		for (i = 0; i < (data_size/10); i++) {
 			memcpy((loopback_data + i*10), temp_str, 10);
 		}
 
 		loopback_ongoing = 1;
-		
+
 		do_gettimeofday(&loopback_res.nStartTime);
-		
+
 		send_loop_back_packet(loopback_data, data_size);
 	}
 	else if (!strncmp(buf, "stop", 4)) {
 		sscanf(buf, "%s", loopback_value);
-		
+
 		loopback_ongoing = 0;
-		
+
 		do_gettimeofday(&loopback_res.nEndTime);
 	}
 	return strnlen(buf, 256);
@@ -343,7 +343,7 @@ static unsigned long workqueue_data = 0;
 #ifndef	NO_TTY_RX_BUFF
 static unsigned char pdp_rx_buf[MAX_PDP_DATA_LEN];
 #else
-#define	MAX_RX_BUFF_LEN		16*1024	
+#define	MAX_RX_BUFF_LEN		16*1024
 static unsigned char pdp_rx_buf[MAX_RX_BUFF_LEN];
 #endif
 
@@ -380,11 +380,9 @@ static struct tty_driver* get_tty_driver_by_id(struct pdp_info *dev)
 		case 25:	index = 4;	break;
 #ifdef MULTIPDP_CDMA
 		case 7:		index = 5;	break;
-		case 9:		index = 6;	break;
-		case 27:	index = 7;	break;
-#endif
+ #endif
 		default:	index = 0;
-		
+
 	}
 
 	return &dev->vs_dev.tty_driver[index];
@@ -402,9 +400,7 @@ static int get_minor_start_index(int id)
 		case 25:	start = 4;	break;
 #ifdef MULTIPDP_CDMA
 		case 7:		start = 5;	break;
-		case 9:		start = 6;	break;
-		case 27:	start = 7;	break;
-#endif
+ #endif
 
 		default:	start = 0;
 	}
@@ -432,7 +428,7 @@ static inline struct file *dpram_open(void)
 
 	oldfs = get_fs(); set_fs(get_ds());
 
-	ret = filp->f_op->unlocked_ioctl(filp, 
+	ret = filp->f_op->unlocked_ioctl(filp,
 				TCGETA, (unsigned long)&termios);
 	set_fs(oldfs);
 	if (ret < 0) {
@@ -449,7 +445,7 @@ static inline struct file *dpram_open(void)
 	termios.c_cc[VTIME] = 1;
 
 	oldfs = get_fs(); set_fs(get_ds());
-	ret = filp->f_op->unlocked_ioctl(filp, 
+	ret = filp->f_op->unlocked_ioctl(filp,
 				TCSETA, (unsigned long)&termios);
 	set_fs(oldfs);
 	if (ret < 0) {
@@ -607,15 +603,15 @@ int	multipdp_rx_cback( char *buf, int len)
 
 			//if( i > 1 )
 			//	printk("================> multipdp_rx_cback : i = %d\n", i);
-				
+
 			if( buf[i+phdr->len+1] != 0x7E)
 				printk("==== NOT 0x7E ...\n");
-			
+
 			ret = multipdp_demux( (char *)&buf[i+1], len-i-1);
-			
+
 			//i = i + phdr->len + 2;
 			i = i + phdr->len+1;
-			
+
 			//printk("multipdp_demux : end ret = %d, next i = %d\n", ret, i);
 			if( ret < 0 || ret == 0 )
 			{
@@ -678,12 +674,12 @@ static int dpram_thread(void *data)
 				break;
 			}
 		}
-		
+
 		else if (ret < 0) {
 			EPRINTK("dpram_poll() failed\n");
 			break;
 		}
-		
+
 		else {
 			char ch;
 			ret = dpram_read(dpram_filp, &ch, sizeof(ch));
@@ -741,7 +737,7 @@ static int vnet_stop(struct net_device *net)
 
 static void vnet_defer_xmit(struct work_struct *data)
 {
-   struct sk_buff *skb = (struct sk_buff *)workqueue_data; 
+   struct sk_buff *skb = (struct sk_buff *)workqueue_data;
    struct net_device *net = (struct net_device *)skb->dev;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 29))
    struct pdp_info *dev = (struct pdp_info *)net->ml_priv;
@@ -758,7 +754,7 @@ static void vnet_defer_xmit(struct work_struct *data)
 	if (ret < 0) {
 		dev->vn_dev.stats.tx_dropped++;
 	}
-	
+
 	else {
 		net->trans_start = jiffies;
 		dev->vn_dev.stats.tx_bytes += skb->len;
@@ -768,7 +764,7 @@ static void vnet_defer_xmit(struct work_struct *data)
 	vnet_start_xmit_flag = 0;
 
 	up(&pdp_txlock);
-    
+
 	netif_wake_queue(net);
 }
 
@@ -823,9 +819,9 @@ static int vnet_start_xmit(struct sk_buff *skb, struct net_device *net)
 	dev->vn_dev.stats.rx_bytes += skb->len;
 #else
    if (vnet_start_xmit_flag != 0) {
-		return NETDEV_TX_BUSY;   
+		return NETDEV_TX_BUSY;
     }
-   vnet_start_xmit_flag = 1; 
+   vnet_start_xmit_flag = 1;
 	workqueue_data = (unsigned long)skb;
 	PREPARE_WORK(&dev->vn_dev.xmit_task,vnet_defer_xmit);
 	schedule_work(&dev->vn_dev.xmit_task);
@@ -848,9 +844,9 @@ static int multipdp_vnet_recv(struct pdp_info *dev, char *buf, size_t len)
 
 	if( dev->vn_dev.net == NULL )
 		printk("====================> dev->vn_dev.net == NULL .. !!!!!!!\n");
-		
+
 	if (!netif_running(dev->vn_dev.net)) {
-		DPRINTK(1, "%s(id: %u) is not running\n", 
+		DPRINTK(1, "%s(id: %u) is not running\n",
 			dev->vn_dev.net->name, dev->id);
 		return -ENODEV;
 	}
@@ -896,7 +892,7 @@ static int vnet_recv(struct pdp_info *dev, size_t len)
 }
 
 	if (!netif_running(dev->vn_dev.net)) {
-		DPRINTK(1, "%s(id: %u) is not running\n", 
+		DPRINTK(1, "%s(id: %u) is not running\n",
 			dev->vn_dev.net->name, dev->id);
 		return -ENODEV;
 	}
@@ -954,7 +950,7 @@ static const struct net_device_ops pdp_netdev_ops = {
 	.ndo_stop		= vnet_stop,
 	.ndo_start_xmit	= vnet_start_xmit,
 	.ndo_get_stats	= vnet_get_stats,
-	.ndo_tx_timeout	= vnet_tx_timeout,		
+	.ndo_tx_timeout	= vnet_tx_timeout,
 };
 
 
@@ -1028,7 +1024,7 @@ static int vs_open(struct tty_struct *tty, struct file *filp)
 	struct pdp_info *dev;
 
 	printk(KERN_ERR "[%s] tty device :%s\n", tty->driver->name);
-	
+
 	dev = pdp_get_serdev(tty->driver->name); // 2.6 kernel porting
 
 	if (dev == NULL) {
@@ -1048,13 +1044,13 @@ static int vs_open(struct tty_struct *tty, struct file *filp)
 			fp_vsEXGPS = 1;
 			break;
 
-      	case 8 : 
+      	case 8 :
          	fp_vsEFS = 1;
-        	break; 
+        	break;
 
-      	case 25 : 
+      	case 25 :
          	fp_vsSMD = 1;
-         	break; 
+         	break;
 
 		default:
 			break;
@@ -1085,13 +1081,13 @@ static void vs_close(struct tty_struct *tty, struct file *filp)
 			fp_vsEXGPS = 0;
 			break;
 
-      	case 8 : 
+      	case 8 :
          	fp_vsEFS = 0;
          	break;
 
-		case 25 : 
+		case 25 :
          	fp_vsSMD = 0;
-         	break; 
+         	break;
 
 		default:
 			break;
@@ -1107,7 +1103,7 @@ static int vs_write(struct tty_struct *tty,
 
 //	mutex_lock(&pdp_lock);
 
-   dev = (struct pdp_info *)tty->driver_data; 
+   dev = (struct pdp_info *)tty->driver_data;
 
 	ret = pdp_mux(dev, buf, count);
 
@@ -1115,16 +1111,16 @@ static int vs_write(struct tty_struct *tty,
 		ret = count;
 	}
 //	 mutex_unlock(&pdp_lock);
-	
+
 	return ret;
 }
 
-static int vs_write_room(struct tty_struct *tty) 
+static int vs_write_room(struct tty_struct *tty)
 {
 	return 8192*2;
 }
 
-static int vs_chars_in_buffer(struct tty_struct *tty) 
+static int vs_chars_in_buffer(struct tty_struct *tty)
 {
 	return 0;
 }
@@ -1175,7 +1171,7 @@ static int multipdp_vs_read(struct pdp_info *dev, char *buf, size_t len)
 
 		if(ret != len)
 			return ret;
-		
+
 		if(dev->vs_dev.tty == NULL)
 			printk(">>>>> TTY is NULL : (1)~ !!!! \n");
 
@@ -1214,7 +1210,7 @@ static int multipdp_vs_read(struct pdp_info *dev, char *buf, size_t len)
 				//do nothing
 				//printk("loopback channel has gotten data, but test is no ongoing\n");
 			}
-			
+
 		}
 		else if (ret > 0 && dev->vs_dev.tty != NULL) {
 			tty_insert_flip_string(dev->vs_dev.tty, pdp_rx_buf, ret);
@@ -1223,18 +1219,18 @@ static int multipdp_vs_read(struct pdp_info *dev, char *buf, size_t len)
 #else
 		if(dev->vs_dev.tty == NULL)
 			printk(">>>>> TTY is NULL : (2)~ !!!! \n");
-		
+
 		if (ret > 0 && dev->vs_dev.tty != NULL) {
 	#if 1
 			ret = multipdp_tty_insert_data(dev->vs_dev.tty, pdp_rx_buf, ret);
-	#else			
+	#else
 			ret = tty_insert_flip_string(dev->vs_dev.tty, pdp_rx_buf, ret);
 	#endif
 			if( ret > 0 )
 				tty_flip_buffer_push(dev->vs_dev.tty);
 		}
 		//printk("RF cal data read.(2) len: %d ret: %d\n", len, ret);
-#endif		
+#endif
 	}
 	//printk("multipdp_vs_read : len = %d\n", ret);
 	return ret;
@@ -1264,11 +1260,11 @@ static int vs_read(struct pdp_info *dev, size_t len)
             else {
                 while (size) {
         			copied_size = (size > MAX_PDP_DATA_LEN) ? MAX_PDP_DATA_LEN : size;
-        			if (size > 0 && dev->vs_dev.tty != NULL) 
+        			if (size > 0 && dev->vs_dev.tty != NULL)
         				insert_size = tty_insert_flip_string(dev->vs_dev.tty, prx_buf+retval, copied_size);
                     if (insert_size != copied_size) {
                         EPRINTK("flip buffer full : %s, insert size : %d, real size : %d\n",dev->vs_dev.tty->name,copied_size,insert_size);
-                        return -1; 
+                        return -1;
                     }
         			size = size - copied_size;
         			retval += copied_size;
@@ -1293,7 +1289,7 @@ static int vs_read(struct pdp_info *dev, size_t len)
         			insert_size = tty_insert_flip_string(dev->vs_dev.tty, pdp_rx_buf, retval);
                     if (insert_size != retval) {
                         EPRINTK("flip buffer full : %s, insert size : %d, real size : %d\n",dev->vs_dev.tty->name,retval,insert_size);
-                        return -1; 
+                        return -1;
                     }
 		tty_flip_buffer_push(dev->vs_dev.tty);
 	}
@@ -1303,7 +1299,7 @@ static int vs_read(struct pdp_info *dev, size_t len)
 
 	return 0;
 }
-static int vs_ioctl(struct tty_struct *tty, struct file *file, 
+static int vs_ioctl(struct tty_struct *tty, struct file *file,
 		    unsigned int cmd, unsigned long arg)
 {
 	return -ENOIOCTLCMD;
@@ -1445,7 +1441,7 @@ static int pdp_mux(struct pdp_info *dev, const void *data, size_t len   )
 	const u8 *buf;
 
    if(pdp_tx_flag){
-	   if (dev->type == DEV_TYPE_NET)	
+	   if (dev->type == DEV_TYPE_NET)
          return -EAGAIN;
    }
 
@@ -1465,9 +1461,9 @@ static int pdp_mux(struct pdp_info *dev, const void *data, size_t len   )
 		hdr->len = nbytes + sizeof(struct pdp_hdr);
 
 		tx_buf[0] = 0x7f;
-		
+
 		memcpy(tx_buf + 1 + sizeof(struct pdp_hdr), buf,  nbytes);
-		
+
 		tx_buf[1 + hdr->len] = 0x7e;
 
 		DPRINTK(2, "hdr->id: %d, hdr->len: %d\n", hdr->id, hdr->len);
@@ -1503,7 +1499,7 @@ static int multipdp_demux(char *buf, int size)
 
 	//printk("multipdp_demux : size = %d\n", size);
    	//mutex_lock(&pdp_lock);
-	
+
 	memcpy( (void *)&hdr, (void *)buf, sizeof( struct pdp_hdr));
 
 	len = hdr.len - sizeof(struct pdp_hdr);
@@ -1512,9 +1508,9 @@ static int multipdp_demux(char *buf, int size)
 
 	if (dev == NULL) {
 		printk("========================================= : (1)\n");
-		yhexdump((char*)&hdr, sizeof(struct pdp_hdr));		
+		yhexdump((char*)&hdr, sizeof(struct pdp_hdr));
 		printk("========================================= : (2)\n");
-		yhexdump((char*)buf, size);	
+		yhexdump((char*)buf, size);
 		printk("========================================= : (3)\n");
 		EPRINTK("invalid id: %u, there is no existing device.\n", hdr.id);
 
@@ -1525,9 +1521,9 @@ static int multipdp_demux(char *buf, int size)
 
 	if( buf[-1] != 0x7F)
 	{
-		printk("============ multipdp_demux :  ******** not 0x7F \n");	
+		printk("============ multipdp_demux :  ******** not 0x7F \n");
 	}
-	
+
 	if( len > size )
 	{
 		printk("============== multipdp_demux : len>size : len=%d, size=%d\n", size, len);
@@ -1537,7 +1533,7 @@ static int multipdp_demux(char *buf, int size)
 	switch (dev->type) {
 		case DEV_TYPE_NET:
 			if( len > 1500 )
-			{	
+			{
 				printk("-------------> len is [%d]\n", len);
 				multipdp_dump();
 			}
@@ -1568,7 +1564,7 @@ static int multipdp_demux(char *buf, int size)
 
    	//mutex_unlock(&pdp_lock);
    	return ret;
-   
+
 err:
 	/* flush the remaining data including stop byte. */
    	//mutex_unlock(&pdp_lock);
@@ -1642,7 +1638,7 @@ static int pdp_activate(pdp_arg_t *pdp_arg, unsigned type, unsigned flags)
 	int ret;
 	struct pdp_info *dev;
 	struct net_device *net;
-   
+
 	dev = vmalloc(sizeof(struct pdp_info) + MAX_PDP_PACKET_LEN);
 	if (dev == NULL) {
 		DPRINTK(1, "out of memory\n");
@@ -1686,7 +1682,7 @@ static int pdp_activate(pdp_arg_t *pdp_arg, unsigned type, unsigned flags)
 		pdp_net_activation_count++;
 		up(&pdp_lock);
 
-		DPRINTK(1, "%s(id: %u) network device created\n", 
+		DPRINTK(1, "%s(id: %u) network device created\n",
 			net->name, dev->id);
 	} else if (type == DEV_TYPE_SERIAL) {
 		init_MUTEX(&dev->vs_dev.write_lock);
@@ -1765,7 +1761,7 @@ static int pdp_deactivate(pdp_arg_t *pdp_arg, int force)
 		pdp_net_activation_count--;
 		//printk("<--- VNET Mutex lock : After .. !!\n");
 #endif
-		DPRINTK(1, "%s(id: %u) network device removed\n", 
+		DPRINTK(1, "%s(id: %u) network device removed\n",
 			dev->vn_dev.net->name, dev->id);
 		vnet_del_dev(dev->vn_dev.net);
 #ifdef	NO_TTY_MUTEX_VNET
@@ -1796,7 +1792,7 @@ static void __exit pdp_cleanup(void)
 		dev = pdp_remove_slot(slot);
 		if (dev) {
 			if (dev->type == DEV_TYPE_NET) {
-				DPRINTK(1, "%s(id: %u) network device removed\n", 
+				DPRINTK(1, "%s(id: %u) network device removed\n",
 					dev->vn_dev.net->name, dev->id);
 				vnet_del_dev(dev->vn_dev.net);
 			} else if (dev->type == DEV_TYPE_SERIAL) {
@@ -1825,7 +1821,7 @@ static int pdp_adjust(const int adjust)
  * App. Interfece Device functions
  */
 
-static int multipdp_ioctl(struct inode *inode, struct file *file, 
+static int multipdp_ioctl(struct inode *inode, struct file *file,
 			      unsigned int cmd, unsigned long arg)
 {
 	int ret, adjust;
@@ -1850,11 +1846,11 @@ static int multipdp_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&adjust, (void *)arg, sizeof (int)))
 			return -EFAULT;
 		return pdp_adjust(adjust);
-        
+
 	case HN_PDP_TXSTART:
 		pdp_tx_flag = 0;
 		return 0;
-			
+
 	case HN_PDP_TXSTOP:
 		pdp_tx_flag = 1;
 		return 0;
@@ -1862,7 +1858,7 @@ static int multipdp_ioctl(struct inode *inode, struct file *file,
     case HN_PDP_CSDSTART:
 		pdp_csd_flag = 0;
 		return 0;
-			
+
 	case HN_PDP_CSDSTOP:
 		pdp_csd_flag = 1;
 		return 0;
@@ -1905,9 +1901,9 @@ static int multipdp_proc_read(char *page, char **start, off_t off,
 
 		p += sprintf(p,
 			     "name: %s\t, id: %-3u, type: %-7s, flags: 0x%04x\n",
-			     dev->type == DEV_TYPE_NET ? 
+			     dev->type == DEV_TYPE_NET ?
 			     dev->vn_dev.net->name : dev->vs_dev.tty_name,
-			     dev->id, 
+			     dev->id,
 			     dev->type == DEV_TYPE_NET ? "network" : "serial",
 			     dev->flags);
 	}
@@ -1945,8 +1941,6 @@ static void dpram_open_work_func(struct work_struct *work)
 		{ .id = 25, .ifname = "ttySMD" },
 #ifdef MULTIPDP_CDMA
 		{ .id = 7, .ifname = "ttyCDMA" },
-		{ .id = 9, .ifname = "ttyCIQ1" },
-		{ .id = 27, .ifname = "ttyCIQ0" },	
 #endif
 	};
 
@@ -1993,16 +1987,16 @@ static int __init multipdp_init(void)
 	}
 
 #ifdef CONFIG_PROC_FS
-	create_proc_read_entry(APP_DEVNAME, 0, 0, 
+	create_proc_read_entry(APP_DEVNAME, 0, 0,
 			       multipdp_proc_read, NULL);
 #endif
 
 #ifdef	NO_TTY_DPRAM
 	printk("multipdp_init:multipdp_rx_noti_regi calling");
-	multipdp_rx_noti_regi(multipdp_rx_cback );	
+	multipdp_rx_noti_regi(multipdp_rx_cback );
 #endif
 
-//	printk(KERN_INFO 
+//	printk(KERN_INFO
 //	       "$Id: multipdp.c,v 1.10 2008/01/11 05:40:56 melonzz Exp $\n");
 	return 0;
 

@@ -434,6 +434,9 @@ int __init socinfo_init(void)
 		cur_cpu = cpu_of_id[socinfo->v1.id];
 
 	socinfo_init_sysdev();
+	
+//  Protected the personal information : Google logchecker issue
+#ifndef     PRODUCT_SHIP
 
 	switch (socinfo->v1.format) {
 	case 1:
@@ -472,6 +475,7 @@ int __init socinfo_init(void)
 		pr_err("%s: Unknown format found\n", __func__);
 		break;
 	}
-
+#endif
+//
 	return 0;
 }

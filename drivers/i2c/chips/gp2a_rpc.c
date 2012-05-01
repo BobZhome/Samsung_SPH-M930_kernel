@@ -11,11 +11,12 @@
 #endif
 /*******************************************************************************/
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 #define MSM_LIGHTSENSOR_ADC_READ
 #endif
 
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 #define MSM_EAR_ADC_READ
 #endif
 
@@ -24,6 +25,7 @@
 #define LIGHTSENSOR_RPC_PROG  0x30000089
 #define LIGHTSENSOR_READ_PROC 12
 #define LIGHTSENSOR_RPC_TIMEOUT 5000	/* 5 sec */
+#define HEADSETSENSOR_RPC_TIMEOUT 1000	/* 1 sec (Fixing PLM Issue P120106-2813) */   
 #define LIGHTSENSOR_CB_TYPE_PROC 		1
 
 #define EAR_READ_PROC 17
@@ -99,7 +101,7 @@ u32 ear_get_adc(void)
 			EAR_READ_PROC,
 			NULL, NULL,
 			msm_lightsensor_get_adc_ret_func, &rep,
-			msecs_to_jiffies(LIGHTSENSOR_RPC_TIMEOUT));
+			msecs_to_jiffies(HEADSETSENSOR_RPC_TIMEOUT));
 
 	if (rc < 0) {
 		pr_err("%s: FAIL: mpp4 get adc. rc=%d\n", __func__, rc);

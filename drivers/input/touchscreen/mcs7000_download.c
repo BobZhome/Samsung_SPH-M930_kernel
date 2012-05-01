@@ -35,8 +35,12 @@
 #if defined(CONFIG_MACH_CHIEF)
 #include "MMS100_CHIEF_RG51_VA21_bin.c"
 
-#else 
-#include "VITAL2_R97_V29_bin.c"
+#elif defined(CONFIG_MACH_ROOKIE2)
+//#include "MMS136_ROOKIE2_REV01_V02_bin.c"
+//#include "ROOKIE2_03_bin.c"
+#include "ROOKIE2_04.c"
+#else
+#include "VITAL2_R99_V29_bin.c"
 #endif
 
 
@@ -73,7 +77,7 @@ static void mcsdl_scl_toggle_twice(void);
 //---------------------------------
 //	Delay functions
 //---------------------------------
-static void mcsdl_delay(UINT32 nCount);
+/*static*/ void mcsdl_delay(UINT32 nCount);
 
 
 //---------------------------------
@@ -189,7 +193,7 @@ int mcsdl_download_binary_data(void)
 	MELFAS_ROLLBACK_BASEBAND_ISR();					// Roll-back Baseband touch interrupt ISR.
 	MELFAS_ROLLBACK_WATCHDOG_TIMER_RESET();			// Roll-back Baseband watchdog timer
 
-	return ( nRet == MCSDL_RET_SUCCESS );
+	return nRet;
 }
 
 #else
@@ -1013,7 +1017,7 @@ static void mcsdl_scl_toggle_twice(void)
 //	Delay Function
 //
 //============================================================
-static void mcsdl_delay(UINT32 nCount)
+/*static*/ void mcsdl_delay(UINT32 nCount)
 {
 
 	switch(nCount) 
@@ -1082,6 +1086,9 @@ static void mcsdl_delay(UINT32 nCount)
         case MCSDL_DELAY_40US :
             udelay(40); 
             break;
+		case MCSDL_DELAY_100MS :
+			msleep(100);
+		    break;
 //end del
 		default : 
 			break;	

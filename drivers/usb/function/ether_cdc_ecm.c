@@ -1219,6 +1219,7 @@ static void  eth_bind(void *_ctxt)
 		goto fail1;
 
 	INFO(dev, "%s, version: " DRIVER_VERSION "\n", driver_desc);
+#ifndef PRODUCT_SHIP
 	INFO(dev, "MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
 		net->dev_addr[0], net->dev_addr[1],
 		net->dev_addr[2], net->dev_addr[3],
@@ -1228,7 +1229,7 @@ static void  eth_bind(void *_ctxt)
 		dev->host_mac[0], dev->host_mac[1],
 		dev->host_mac[2], dev->host_mac[3],
 		dev->host_mac[4], dev->host_mac[5]);
-
+#endif
 	string_data = usb_msm_get_next_strdesc_id("Ethernet Data");
 	if (string_data != 0) {
 		string_control = usb_msm_get_next_strdesc_id

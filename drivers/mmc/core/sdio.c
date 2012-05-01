@@ -217,10 +217,10 @@ static int sdio_disable_wide(struct mmc_card *card)
 	if (ret)
 		return ret;
 
-	if (!(ctrl & SDIO_BUS_WIDTH_4BIT))
+	if (!(ctrl & (SDIO_BUS_WIDTH_4BIT | SDIO_BUS_WIDTH_8BIT)))
 		return 0;
 
-	ctrl &= ~SDIO_BUS_WIDTH_4BIT;
+	ctrl &= ~(SDIO_BUS_WIDTH_4BIT | SDIO_BUS_WIDTH_8BIT);
 	ctrl |= SDIO_BUS_ASYNC_INT;
 
 	ret = mmc_io_rw_direct(card, 1, 0, SDIO_CCCR_IF, ctrl, NULL);
@@ -397,7 +397,12 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 		mmc_set_clock(host, card->cis.max_dtr);
 	}
 #else
-	printk("host->index ~~~ %d", host->index);
+
+//  Protecting the personal information : Google Logchecker issue
+#ifndef PRODUCT_SHIP
+    printk("host->index ~~~ %d", host->index);
+#endif
+
 	if(host->index == 1){	
 		#ifdef CONFIG_MACH_CHIEF
 			mmc_set_clock(host, 24000000);			
