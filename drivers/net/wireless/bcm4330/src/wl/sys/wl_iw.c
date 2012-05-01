@@ -6872,37 +6872,31 @@ get_softap_auto_channel(struct net_device *dev, struct ap_profile *ap)
 	ASSERT(iolen);
 	res |= dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen);
 #endif
+	auto_channel_retry:
 			request.count = htod32(0);
 			ret = dev_wlc_ioctl(dev, WLC_START_CHANNEL_SEL, &request, sizeof(request));
 			if (ret < 0) {
-			WL_ERROR(("can't start auto channel scan, error code = %d\n", ret));
+				WL_ERROR(("can't start auto channel scan\n"));
 				goto fail;
 			}
 
 	get_channel_retry:
-		bcm_mdelay(350);
+			bcm_mdelay(500);
 
-		ret = dev_wlc_ioctl(dev, WLC_GET_CHANNEL_SEL, &chosen, sizeof(chosen));
-		if (ret < 0 || dtoh32(chosen) == 0) {
-			if (retry++ < 15) {
+			ret = dev_wlc_ioctl(dev, WLC_GET_CHANNEL_SEL, &chosen, sizeof(chosen));
+			if (ret < 0 || dtoh32(chosen) == 0) {
+				if (retry++ < 3)
 					goto get_channel_retry;
-			} else {
-				if (ret < 0) {
+				else {
 					WL_ERROR(("can't get auto channel sel, err = %d, "
-							  "chosen = 0x%04X\n", ret, (uint16)chosen));
+					          "chosen = %d\n", ret, chosen));
 					goto fail;
-				} else { /* no error, just timed out */
-					ap->channel = (uint16)last_auto_channel;
-					WL_ERROR(("auto channel sel timed out. we get channel %d\n", ap->channel));
 				}
 			}
-		}
-
-		if (chosen) {
-			ap->channel = (uint16)chosen & 0x00FF;
-			WL_SOFTAP(("Set auto channel = %d\n", ap->channel));
-		}
-
+			if ((chosen == 1) && (!rescan++))
+				goto auto_channel_retry;
+			WL_SOFTAP(("Set auto channel = %d\n", chosen));
+			ap->channel = chosen;
 			if ((res = dev_wlc_ioctl(dev, WLC_DOWN, &updown, sizeof(updown))) < 0) {
 				WL_ERROR(("%s fail to set up err =%d\n", __FUNCTION__, res));
 				goto fail;
@@ -7045,7 +7039,7 @@ set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 
 		updown = 1;
 		if ((res = dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown))) < 0) {
-			WL_ERROR(("%s fail to set WLC_UP \n", __FUNCTION__));
+			WL_ERROR(("%s fail to set apsta \n", __FUNCTION__));
 			goto fail;
 		}
 
@@ -7067,7 +7061,7 @@ set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 
 	/* ----  AP channel autoselect --- */
 	if ((ap->channel == 0) && (get_softap_auto_channel(dev, ap) < 0)) {
-		ap->channel = 6;
+		ap->channel = 1;
 		WL_ERROR(("%s auto channel failed, pick up channel=%d\n",
 			__FUNCTION__, ap->channel));
 	}

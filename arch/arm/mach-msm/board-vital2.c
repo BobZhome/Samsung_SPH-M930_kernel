@@ -4929,16 +4929,11 @@ static struct resource bluesleep_resources_rev05[] = {
          bluesleep_stop();
          gpio_direction_output(GPIO_BT_RESET, GPIO_WLAN_LEVEL_LOW);/* BT_VREG_CTL */
 
-#ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
-         gpio_direction_output(GPIO_BT_WLAN_REG_ON, GPIO_WLAN_LEVEL_LOW);/* GPIO_BT_WLAN_REG_ON */
-         mdelay(150);
-#else
          if( gpio_get_value(GPIO_WLAN_RESET) == GPIO_WLAN_LEVEL_LOW ) //SEC_BLUETOOTH : pjh_2010.06.30
          {
-             gpio_direction_output(GPIO_BT_WLAN_REG_ON, GPIO_WLAN_LEVEL_LOW);/* GPIO_BT_WLAN_REG_ON */
+             gpio_direction_output(GPIO_BT_WLAN_REG_ON, GPIO_WLAN_LEVEL_LOW);/* BT_RESET */
              mdelay(150);
          }
-#endif         
          gpio_direction_output(GPIO_BT_WAKE, GPIO_WLAN_LEVEL_LOW);/* BT_VREG_CTL */
 
          if(system_rev >= 5)
