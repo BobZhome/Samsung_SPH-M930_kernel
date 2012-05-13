@@ -213,7 +213,8 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	vsync_polarity = 0;
 #endif
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	hsync_polarity = 0;
 	vsync_polarity = 0;
 	lcdc_underflow_clr |= 0x80000000;	/* enable recovery */
@@ -245,7 +246,7 @@ int mdp_lcdc_on(struct platform_device *pdev)
 
 	ret = panel_next_on(pdev);
 	if (ret == 0) {
-#ifndef CONFIG_MACH_VITAL2
+#if !defined CONFIG_MACH_VITAL2 && !defined (CONFIG_MACH_ROOKIE2)
 		/* enable LCDC block */
 		MDP_OUTP(MDP_BASE + LCDC_BASE, 1);
 		mdp_pipe_ctrl(MDP_OVERLAY0_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
@@ -388,7 +389,7 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 	mutex_unlock(&mfd->dma->ov_mutex);
 }
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 void mdp4_overlay_block_on(void)
 {
 	/* enable LCDC block */

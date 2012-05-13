@@ -400,6 +400,7 @@ int yaffs2_CheckpointInvalidateStream(yaffs_Device *dev)
 		dump_stack();
 	}
 	
+
 	return yaffs2_CheckpointErase(dev);
 }
 

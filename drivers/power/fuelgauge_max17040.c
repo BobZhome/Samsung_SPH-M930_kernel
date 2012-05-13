@@ -140,7 +140,7 @@ unsigned int fg_read_soc(void)
 
 #ifdef CONFIG_MACH_CHIEF
 	adj_soc = ((adj_soc - 10) * 100) / (951 - 10);
-#elif CONFIG_MACH_VITAL2
+#elif CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	adj_soc = ((adj_soc - 10) * 100) / (940 - 10);
 #endif
 

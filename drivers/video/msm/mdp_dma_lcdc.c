@@ -245,7 +245,8 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	vsync_polarity = 0;
 #endif
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	data_en_polarity = 1;
 #else
 	data_en_polarity = 0;

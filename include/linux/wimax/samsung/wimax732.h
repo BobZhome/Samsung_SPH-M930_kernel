@@ -40,6 +40,7 @@ struct wimax_cfg {
 //	int			uart_sel1;
 	struct wake_lock	wimax_wake_lock;	/* resume wake lock */
 	struct wake_lock	wimax_rxtx_lock;/* sdio wake lock */
+	struct mutex		poweroff_mutex; /*To avoid executing poweroff simultaneously*/
 	u8		enable_dump_msg;/* prints control dump msg */
 	u8		wimax_mode;/* wimax mode (SDIO, USB, etc..) */
 	u8		sleep_mode;/* suspend mode (0: VI, 1: IDLE) */

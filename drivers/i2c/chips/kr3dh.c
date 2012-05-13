@@ -44,7 +44,7 @@
 /*
  * Default parameters
  */
-#define KR3DH_DEFAULT_DELAY         100
+#define KR3DH_DEFAULT_DELAY         200
 #define KR3DH_MAX_DELAY             2000
 
 /*
@@ -69,10 +69,11 @@
 #define KR3DM_ID                    0x12
 #define KR3DH_ID                    0x32
 
-#define KR3DH_CR1_PM_NORMAL         0x20
-#define KR3DH_CR1_DR_50             0x00
-#define KR3DH_CR1_DR_100            0x08
-#define KR3DH_CR1_DR_400            0x10
+#define KR3DH_CR1_PM0_NORMAL         0x20 //Normal Mode [ODR]
+#define KR3DH_CR1_PM1_NORMAL         0x40 //Low-power [0.5]
+#define KR3DH_CR1_DR_50             0x00 //50 Output Data Rate [Hz]
+#define KR3DH_CR1_DR_100            0x08 //100 Output Data Rate [Hz]
+#define KR3DH_CR1_DR_400            0x10 //400 Output Data Rate [Hz]
 #define KR3DH_CR1_DR_1000           0x18
 #define KR3DH_CR1_Z_ENABLE          0x04
 #define KR3DH_CR1_Y_ENABLE          0x02
@@ -94,12 +95,12 @@
 #define KR3DM_RESOLUTION            64
 #define KR3DH_RESOLUTION            16384
 
+#define KR3DH_THRESHOLD             100000 //459682
 
 /* ABS axes parameter range [um/s^2] (for input event) */
 #define GRAVITY_EARTH                   9806550
 #define ABSMIN_2G                       (-GRAVITY_EARTH * 2)
 #define ABSMAX_2G                       (GRAVITY_EARTH * 2)
-
 
 struct acceleration {
 	int x;
@@ -244,8 +245,10 @@ static int kr3dh_power_up(struct kr3dh_data *kr3dh)
 {
 	struct i2c_client *client = kr3dh->client;
 	u8 data;
-	data = kr3dh->odr | KR3DH_CR1_XYZ_ENABLE;
-	//data = KR3DH_CR1_XYZ_ENABLE | KR3DH_CR1_PM_NORMAL;
+
+	//data = kr3dh->odr | KR3DH_CR1_XYZ_ENABLE;
+	//data = ((kr3dh->odr | KR3DH_CR1_XYZ_ENABLE) & ~(1<<(4-1))) & ~(1<<(5-1));
+	data = KR3DH_CR1_XYZ_ENABLE | KR3DH_CR1_PM0_NORMAL;
 	printk("%s data[%d]\n",__func__,data);
 	kr3dh_write(client, KR3DH_CTRL_REG1, &data, 1);
 
@@ -353,7 +356,7 @@ static void kr3dh_set_delay(struct device *dev, unsigned long delay)
 	u8 data;
 
 	/* determine optimum ODR */
-	for (i = 0; (i < size) && (actual_delay(delay) >= odr_table[i].delay); i++)
+	for (i = 1; (i < size) && (actual_delay(delay) >= odr_table[i].delay); i++)
 	{
 		;;//printk("%s odr_table[i=%d].delay[%d].odr[%d] \n",__func__,i,odr_table[i].delay,odr_table[i].odr);
 	}
@@ -366,11 +369,13 @@ static void kr3dh_set_delay(struct device *dev, unsigned long delay)
 	/* update CTRL register and reschedule work_queue if enable=1 */
 	if (kr3dh_get_enable(dev)) {
 		cancel_delayed_work_sync(&kr3dh->work);
-		data = kr3dh->odr | KR3DH_CR1_XYZ_ENABLE;
-		//data = KR3DH_CR1_XYZ_ENABLE | KR3DH_CR1_PM_NORMAL;
+
+		//data = kr3dh->odr | KR3DH_CR1_XYZ_ENABLE;
+		//data = ((kr3dh->odr | KR3DH_CR1_XYZ_ENABLE) & ~(1<<(4-1))) & ~(1<<(5-1));
+		data = KR3DH_CR1_XYZ_ENABLE | KR3DH_CR1_PM0_NORMAL;
+		printk("%s data[%d]\n",__func__,data);
 		kr3dh_write(client, KR3DH_CTRL_REG1, &data, 1);
-		schedule_delayed_work(&kr3dh->work,
-				delay_to_jiffies(delay) + 1);
+		schedule_delayed_work(&kr3dh->work, delay_to_jiffies(delay) + 1);
 	}
 
 	mutex_unlock(&kr3dh->enable_mutex);
@@ -845,6 +850,7 @@ static int kr3dh_probe(struct i2c_client *client,
 	kr3dh_hw_init(kr3dh);
 	kr3dh_set_delay(&client->dev, KR3DH_DEFAULT_DELAY);
 	kr3dh_set_position(&client->dev, CONFIG_INPUT_KR3DH_POSITION);
+	kr3dh_set_threshold(&client->dev, KR3DH_THRESHOLD);
 
 	/* setup driver interfaces */
 	INIT_DELAYED_WORK(&kr3dh->work, kr3dh_work_func);

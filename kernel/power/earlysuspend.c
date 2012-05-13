@@ -17,7 +17,6 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/rtc.h>
-#include <linux/syscalls.h> /* sys_sync */
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
 
@@ -30,24 +29,10 @@ enum {
 static int debug_mask = DEBUG_USER_STATE;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
-#ifdef CONFIG_SYS_SYNC_IN_WORKQUEUE
-#include <linux/delay.h>
-extern struct wake_lock sync_wake_lock;
-extern struct workqueue_struct *sync_work_queue;
-static DECLARE_WAIT_QUEUE_HEAD(sync_wait_queue);
-int sync_in_progress;
-#endif
-
 static DEFINE_MUTEX(early_suspend_lock);
 static LIST_HEAD(early_suspend_handlers);
-#ifdef CONFIG_SYS_SYNC_IN_WORKQUEUE
-static void sync_system(struct work_struct *work);
-#endif
 static void early_suspend(struct work_struct *work);
 static void late_resume(struct work_struct *work);
-#ifdef CONFIG_SYS_SYNC_IN_WORKQUEUE
-static DECLARE_WORK(sync_system_work, sync_system);
-#endif
 static DECLARE_WORK(early_suspend_work, early_suspend);
 static DECLARE_WORK(late_resume_work, late_resume);
 static DEFINE_SPINLOCK(state_lock);
@@ -57,40 +42,7 @@ enum {
 	SUSPEND_REQUESTED_AND_SUSPENDED = SUSPEND_REQUESTED | SUSPENDED,
 };
 static int state;
-#ifdef CONFIG_SYS_SYNC_IN_WORKQUEUE
-static void sync_system(struct work_struct *work)
-{
-	sync_in_progress = 1;
-	pr_info("%s: start\n", __func__);
-	wake_lock(&sync_wake_lock);
-	sys_sync();
-	wake_unlock(&sync_wake_lock);
-	pr_info("%s: done.\n", __func__);
-	sync_in_progress = 0;
-	wake_up(&sync_wait_queue);
-}
 
-int queue_sync_work(void)
-{
-	int ret;
-	
-	ret = queue_work(sync_work_queue, &sync_system_work);
-	if(ret == 0)
-		pr_info("%s: sync work already in queue!\n", __func__);
-	else
-		msleep(1); // give some time to start sync
-
-	ret = wait_event_interruptible_timeout(sync_wait_queue, (sync_in_progress==0), msecs_to_jiffies(3000));
-	if (ret == -ERESTARTSYS) {
-		pr_info("%s: sig pending just wait 100ms\n");
-		msleep(100);
-	} else 
-		pr_info("%s: wait returned %d\n", __func__, ret);
-	
-	return ret;
-}
-
-#endif
 void register_early_suspend(struct early_suspend *handler)
 {
 	struct list_head *pos;
@@ -148,15 +100,7 @@ static void early_suspend(struct work_struct *work)
 	}
 	mutex_unlock(&early_suspend_lock);
 
-	if (debug_mask & DEBUG_SUSPEND)
-		pr_info("early_suspend: sync\n");
-
-#ifdef CONFIG_SYS_SYNC_IN_WORKQUEUE
-	queue_sync_work();
-#else
-	sys_sync();
-#endif
-
+	suspend_sys_sync_queue();
 abort:
 	spin_lock_irqsave(&state_lock, irqflags);
 	if (state == SUSPEND_REQUESTED_AND_SUSPENDED)
@@ -187,7 +131,7 @@ static void late_resume(struct work_struct *work)
 		pr_info("late_resume: call handlers\n");
 	list_for_each_entry_reverse(pos, &early_suspend_handlers, link)
 		if (pos->resume != NULL) {
-			pr_info("late_resume: %pS\n", pos->resume);
+			//pr_info("late_resume: %pS\n", pos->resume);  Fixing Log Checker issues
 			pos->resume(pos);
 		}
 	if (debug_mask & DEBUG_SUSPEND)
@@ -208,6 +152,7 @@ void request_suspend_state(suspend_state_t new_state)
 		struct rtc_time tm;
 		getnstimeofday(&ts);
 		rtc_time_to_tm(ts.tv_sec, &tm);
+#ifndef PRODUCT_SHIP
 		pr_info("request_suspend_state: %s (%d->%d) at %lld "
 			"(%d-%02d-%02d %02d:%02d:%02d.%09lu UTC)\n",
 			new_state != PM_SUSPEND_ON ? "sleep" : "wakeup",
@@ -215,6 +160,7 @@ void request_suspend_state(suspend_state_t new_state)
 			ktime_to_ns(ktime_get()),
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
+#endif
 	}
 	if (!old_sleep && new_state != PM_SUSPEND_ON) {
 		state |= SUSPEND_REQUESTED;

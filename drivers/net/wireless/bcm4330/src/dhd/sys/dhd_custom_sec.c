@@ -55,8 +55,9 @@ start_readmac:
 			
 			sprintf(macbuffer,"%02X:%02X:%02X:%02X:%02X:%02X\n",
 				0x60,0xd0,0xa9,randommac[0],randommac[1],randommac[2]);
+#ifndef PRODUCT_SHIP
 			DHD_ERROR(("[WIFI] The Random Generated MAC ID : %s\n", macbuffer));
-
+#endif
 			if(fp->f_mode & FMODE_WRITE) {			
 				ret = fp->f_op->write(fp, (const char *)macbuffer, sizeof(macbuffer), &fp->f_pos);
 				if(ret < 0)
@@ -74,7 +75,9 @@ start_readmac:
 		/* Reading the MAC Address from .nvmac.info file( the existed file or just created file)*/
 		ret = kernel_read(fpnv, 0, buf, 18);
 		buf[17] ='\0';   // to prevent abnormal string display when mac address is displayed on the screen. 
+#ifndef PRODUCT_SHIP
 		DHD_ERROR(("Read MAC : [%s] [%d] \r\n" , buf, strncmp(buf , "00:00:00:00:00:00" , 17)));
+#endif
 		if(strncmp(buf , "00:00:00:00:00:00" , 17) == 0) {
 			filp_close(fpnv, NULL);
 			goto start_readmac;
@@ -231,8 +234,10 @@ int CheckRDWR_Macaddr(	struct dhd_info *dhd, dhd_pub_t *dhdp, struct ether_addr 
 			return -1;
 		}
 		else {
+#ifndef PRODUCT_SHIP
 			DHD_ERROR(("MAC (OTP) : [%02X:%02X:%02X:%02X:%02X:%02X] \r\n" , 
 			cur_mac[0], cur_mac[1], cur_mac[2], cur_mac[3], cur_mac[4], cur_mac[5]));
+#endif
 		}
 		//dhd_os_proto_unblock(dhdp);
 		
@@ -260,7 +265,9 @@ int CheckRDWR_Macaddr(	struct dhd_info *dhd, dhd_pub_t *dhdp, struct ether_addr 
 			buf[17] ='\0';
 
 			is_zeromac = strncmp(buf, "00:00:00:00:00:00", 17);
+#ifndef PRODUCT_SHIP
 			DHD_ERROR(("MAC (FILE): [%s] [%d] \r\n" , buf, is_zeromac));
+#endif
 
 			if (is_zeromac == 0) {
 				DHD_ERROR(("Zero MAC detected. Trying Random MAC.\n"));
@@ -290,7 +297,9 @@ int CheckRDWR_Macaddr(	struct dhd_info *dhd, dhd_pub_t *dhdp, struct ether_addr 
 		/* Reading the MAC Address from .nvmac.info file( the existed file or just created file)*/
 		ret = kernel_read(fp_nvm, 0, buf, 18);
 		buf[17] ='\0';   // to prevent abnormal string display when mac address is displayed on the screen. 
+#ifndef PRODUCT_SHIP
 		DHD_ERROR(("Read MAC : [%s] [%d] \r\n" , buf, strncmp(buf , "00:00:00:00:00:00" , 17)));
+#endif
 		if(strncmp(buf , "00:00:00:00:00:00" , 17) == 0) {
 			filp_close(fp_nvm, NULL);
 			g_iMacFlag = MACADDR_COB_RANDOM;
@@ -315,7 +324,9 @@ int CheckRDWR_Macaddr(	struct dhd_info *dhd, dhd_pub_t *dhdp, struct ether_addr 
 		get_random_bytes(randommac, 3);
 		sprintf(macbuffer,"%02X:%02X:%02X:%02X:%02X:%02X\n",
 				0x60,0xd0,0xa9,randommac[0],randommac[1],randommac[2]);		
+#ifndef PRODUCT_SHIP
 		DHD_ERROR(("[WIFI] The Random Generated MAC ID : %s\n", macbuffer));
+#endif
 		sscanf(macbuffer,"%02X:%02X:%02X:%02X:%02X:%02X",
 			   &(mac->octet[0]), &(mac->octet[1]), &(mac->octet[2]), 
 			   &(mac->octet[3]), &(mac->octet[4]), &(mac->octet[5]));

@@ -41,9 +41,9 @@
 #include <linux/hrtimer.h>
 
 extern void sensor_rough_control(void __user *arg);
-#if defined(CONFIG_MACH_CHIEF)
+#if defined(CONFIG_MACH_CHIEF) || defined (CONFIG_MACH_PREVAIL2)
 extern void sensor_rough_control_sr130pc10(void __user *arg);
-#else if defined(CONFIG_MACH_VITAL2)
+#else if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2)
 extern void sensor_rough_control_sr030pc30(void __user *arg);
 #endif
 
@@ -2415,9 +2415,9 @@ static long msm_ioctl_control(struct file *filep, unsigned int cmd,
                 break;
 
         case MSM_CAM_IOCTL_PCAM_CTRL_8BIT_FRONT:
-#if defined(CONFIG_MACH_CHIEF)
+#if defined(CONFIG_MACH_CHIEF) || defined (CONFIG_MACH_PREVAIL2)
 		sensor_rough_control_sr130pc10(argp);
-#else if defined(CONFIG_MACH_VITAL2)
+#else if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2)
 		sensor_rough_control_sr030pc30(argp);
 #endif
                 rc = 0;
@@ -2477,6 +2477,7 @@ static int __msm_release(struct msm_sync *sync)
 			kfree(region);
 		}
 		msm_queue_drain(&sync->pict_q, list_pict);
+		msm_queue_drain(&sync->event_q, list_config);
 
 		wake_unlock(&sync->wake_lock);
 		sync->apps_id = NULL;
@@ -2976,6 +2977,7 @@ static int __msm_open(struct msm_sync *sync, const char *const apps_id,
 			if (rc < 0) {
 				pr_err("%s: sensor init failed: %d\n",
 					__func__, rc);
+				msm_camio_sensor_clk_off(sync->pdev);
 				goto msm_open_done;
 			}
 			rc = sync->vfefn.vfe_init(&msm_vfe_s,
@@ -2983,6 +2985,8 @@ static int __msm_open(struct msm_sync *sync, const char *const apps_id,
 			if (rc < 0) {
 				pr_err("%s: vfe_init failed at %d\n",
 					__func__, rc);
+				sync->sctrl.s_release();
+				msm_camio_sensor_clk_off(sync->pdev);
 				goto msm_open_done;
 			}
 		} else {

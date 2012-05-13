@@ -24,9 +24,6 @@
 #include <linux/suspend.h>
 
 #include "power.h"
-#ifdef CONFIG_SYS_SYNC_IN_WORKQUEUE
-extern int queue_sync_work(void);
-#endif
 const char *const pm_states[PM_SUSPEND_MAX] = {
 #ifdef CONFIG_EARLYSUSPEND
 	[PM_SUSPEND_ON]		= "on",
@@ -276,13 +273,7 @@ int enter_state(suspend_state_t state)
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
 
-	printk(KERN_INFO "PM: Syncing filesystems ... ");
-#ifdef CONFIG_SYS_SYNC_IN_WORKQUEUE
-	queue_sync_work();
-#else
-	sys_sync();
-#endif
-	printk("done.\n");
+	suspend_sys_sync_queue();
 
 	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state]);
 	error = suspend_prepare();

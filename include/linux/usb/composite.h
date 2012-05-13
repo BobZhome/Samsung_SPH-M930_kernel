@@ -102,13 +102,14 @@ struct usb_function {
 	struct usb_descriptor_header	**hs_descriptors;
 
 	struct usb_configuration	*config;
-	int				hidden;
 	u8				*ctrl_id;
 	u8				*data_id;
 
 	/* disabled is zero if the function is enabled */
 	int				disabled;
-
+#ifdef CONFIG_USB_SAMSUNG_DRIVER
+	int				hidden;
+#endif
 	/* REVISIT:  bind() functions can be marked __init, which
 	 * makes trouble for section mismatch analysis.  See if
 	 * we can't restructure things to avoid mismatching.

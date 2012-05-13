@@ -257,7 +257,7 @@ const int temp_table[][2] =  {
 #define BATT_TEMP_LOW_BLOCK			103	// 	-3`C
 #define BATT_TEMP_LOW_RECOVER		124	//	0`C
 
-#elif CONFIG_MACH_VITAL2
+#elif defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 
 #define BATT_TEMP_EVENT_BLOCK		373
 #define BATT_TEMP_HIGH_BLOCK		354 //359 //348	
@@ -285,9 +285,13 @@ const int temp_table[][2] =  {
 static int temp_test_adc = 0;
 #endif
 
-static int batt_check = 0;
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 static int chg_start_time_event = 0;
+
+#if defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
+extern int smb328a_charger_control(int fast_charging_current, int termination_current, int on);
+#endif
+
 #endif
 
 enum {
@@ -456,7 +460,9 @@ struct msm_battery_info {
 	u32(*calculate_capacity) (u32 voltage);	// NC
 
 	s32 batt_handle;
-
+#if defined(CONFIG_MACH_VITAL2)	|| defined(CONFIG_MACH_PREVAIL2)
+	struct msm_psy_batt_pdata *pdata;
+#endif
 	struct power_supply *msm_psy_ac;
 	struct power_supply *msm_psy_usb;
 	struct power_supply *msm_psy_batt;
@@ -860,10 +866,10 @@ static ssize_t msm_batt_store_property(struct device *dev,
 		if (sscanf(buf, "%d\n", &x) == 1) {
 			msm_batt_info.chg_temp_event_check = x;
 			ret = count;
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 			if( (msm_batt_info.batt_status == POWER_SUPPLY_STATUS_CHARGING) ||
 				(msm_batt_info.batt_recharging == 1) ){
-				printk(KERN_ERR "%s: chg_temp_event_check = 0x%x!!!!!!!!!!\n", __func__,msm_batt_info.chg_temp_event_check);
+//				printk(KERN_ERR "%s: chg_temp_event_check = 0x%x!!!!!!!!!!\n", __func__,msm_batt_info.chg_temp_event_check);
 				chg_start_time_event = 1;
 				msm_batt_chg_en(START_CHARGING);
 				chg_start_time_event = 0;
@@ -876,7 +882,7 @@ static ssize_t msm_batt_store_property(struct device *dev,
 		if (sscanf(buf, "%d\n", &x) == 1) {
 			msm_batt_info.talk_gsm = x;
 			ret = count;
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 			if( (msm_batt_info.batt_status == POWER_SUPPLY_STATUS_CHARGING) ||
 				(msm_batt_info.batt_recharging == 1) ){
 				chg_start_time_event = 1;
@@ -1022,7 +1028,7 @@ static int fg_set_alert(int value)
 }
 #endif	/* CONFIG_MAX17043_FUEL_GAUGE */
 
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 extern void fuel_gauge_rcomp(int state);
 #endif
 
@@ -1039,18 +1045,41 @@ static void msm_batt_chg_en(chg_enable_type enable)
 		// Set charging current (ICHG; mA)
 		if (msm_batt_info.charging_source & AC_CHG)
 		{
+		//  Protecting the personal information : Google Logchecker issue
+		#ifndef PRODUCT_SHIP
 			pr_info("[BATT] %s: Start charging! (charging_source = AC)\n", __func__);
+		#endif
 			hsusb_chg_connected_ext(USB_CHG_TYPE__WALLCHARGER);
 			//requested by HW
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 			if(msm_batt_info.talk_gsm !=0x00)
 				hsusb_chg_vbus_draw_ext(600);
 			else{
-				printk(KERN_ERR "%s: chg_temp_event_check = 0x%x\n", __func__,msm_batt_info.chg_temp_event_check);
+//				printk(KERN_ERR "%s: chg_temp_event_check = 0x%x\n", __func__,msm_batt_info.chg_temp_event_check);
 				if((msm_batt_info.chg_temp_event_check & USE_BROWSER)|(msm_batt_info.chg_temp_event_check & USE_CAM))
-					hsusb_chg_vbus_draw_ext(500);
+				{
+					#if !defined (CONFIG_MACH_ROOKIE2) && !defined(CONFIG_MACH_PREVAIL2)
+						hsusb_chg_vbus_draw_ext(500);
+					#else
+						#if defined (CONFIG_MACH_PREVAIL2)
+							smb328a_charger_control(450,200,1);
+						#else
+							smb328a_charger_control(500,200,1);
+						#endif
+					#endif
+				}
 				else
-					hsusb_chg_vbus_draw_ext(650);	// TA charging	(600mA)
+				{
+					#if !defined (CONFIG_MACH_ROOKIE2) && !defined(CONFIG_MACH_PREVAIL2)
+						hsusb_chg_vbus_draw_ext(650);	// TA charging	(600mA)
+					#else
+						#if defined (CONFIG_MACH_PREVAIL2)
+							smb328a_charger_control(800,200,1);
+						#else 
+							smb328a_charger_control(650,200,1);
+						#endif
+					#endif
+				}
 			}
 #else
 					hsusb_chg_vbus_draw_ext(650);	// TA charging	(600mA)
@@ -1060,9 +1089,13 @@ static void msm_batt_chg_en(chg_enable_type enable)
 		{
 			pr_info("[BATT] %s: Start charging! (charging_source = USB)\n", __func__);
 			hsusb_chg_connected_ext(USB_CHG_TYPE__SDP);
-			hsusb_chg_vbus_draw_ext(450); // USB charging	(400mA)
+			#if !defined (CONFIG_MACH_ROOKIE2) && !defined(CONFIG_MACH_PREVAIL2)
+				hsusb_chg_vbus_draw_ext(450); // USB charging	(400mA)
+			#else
+				smb328a_charger_control(450,200,1);
+			#endif
 		}
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 		fuel_gauge_rcomp(START_CHARGING);
 		if(chg_start_time_event == 0) 
 			msm_batt_set_charging_start_time(START_CHARGING);
@@ -1082,14 +1115,19 @@ static void msm_batt_chg_en(chg_enable_type enable)
 		if (msm_batt_info.charging_source == NO_CHG)
 			hsusb_chg_connected_ext(USB_CHG_TYPE__INVALID);	// not charging
 		else
-			hsusb_chg_vbus_draw_ext(0);	// discharging
-
+		{
+			#if !defined (CONFIG_MACH_ROOKIE2) && !defined(CONFIG_MACH_PREVAIL2)
+				hsusb_chg_vbus_draw_ext(0);	// discharging
+			#else
+				smb328a_charger_control(0,200,0);
+			#endif
+		}
 		msm_batt_average_chg_current(-1);	// Initialize all current data sampling
 
 		pr_info("[BATT] %s: Stop charging! (charging_source = 0x%x, full_check = %d)\n",
 			__func__, msm_batt_info.charging_source, msm_batt_info.batt_full_check);
 
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 		fuel_gauge_rcomp(STOP_CHARGING);
 #endif
 	}
@@ -1283,7 +1321,10 @@ static int msm_batt_check_level(int battery_level)
 
 	if (msm_batt_info.batt_capacity != battery_level)
 	{
+	//  Protecting the personal information : Google Logchecker issue
+	#ifndef PRODUCT_SHIP
 		pr_info("[BATT] %s: Battery level changed ! (%d -> %d)\n", __func__, msm_batt_info.batt_capacity, battery_level);
+	#endif
 		msm_batt_info.batt_capacity = battery_level;
 		return 1;
 	}
@@ -1458,7 +1499,7 @@ static enum hrtimer_restart led_timer_func(struct hrtimer *timer)
 
 #endif
 
-static int msm_batt_event_block()
+static int msm_batt_event_block(void)
 {
 	if( (msm_batt_info.chg_temp_event_check != 0x00) || (msm_batt_info.talk_gsm !=0x00) || (msm_batt_info.data_call !=0x00) )
 	{
@@ -1503,7 +1544,7 @@ static int msm_batt_control_temperature(u32 temp_adc)
 		compensation[HIGH_RECOVERY] = 5;		//BATT_TEMP_HIGH_RECOVER 315 + 5 = 320	
 		compensation[LOW_RECOVERY] = -14;		//BATT_TEMP_LOW_RECOVER 124 - 14 = 110	
 	}		
-#elif CONFIG_MACH_VITAL2
+#elif defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	{
 		compensation[HIGH_BLOCK] = -22; 	//BATT_TEMP_HIGH_BLOCK		332 - 354 = -22
 		compensation[LOW_BLOCK] = 3;		//BATT_TEMP_LOW_BLOCK		113 - 110 = 3
@@ -1689,7 +1730,6 @@ static int msm_batt_get_batt_chg_status(void)
 	struct rpc_reply_batt_chg_v1 *v1p;
 
 	req_batt_chg.more_data = cpu_to_be32(1);
-
 	memset(&rep_batt_chg, 0, sizeof(rep_batt_chg));
 
 	v1p = &rep_batt_chg.v1;
@@ -1722,11 +1762,6 @@ static int msm_batt_get_batt_chg_status(void)
 static unsigned int msm_batt_check_vfopen(u32 vf)		//open: 2400 , close: 620
 {
 	unsigned int rc = 0;
-    int vf_adc[6] = {0,};
-	int vf_max = 0;
-	int vf_min = 0;
-	int vf_total = 0;
-    int i;
 	static int batt_id_check = 0;
 
 	extern int is_enabled_lcd(void);
@@ -1783,7 +1818,7 @@ static void msm_batt_update_psy_status(void)
 		msleep(3);
 		msm_batt_chg_en(START_CHARGING);
 		flag = 1;
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 		if(charging_boot)
 		{
 			if(accel_vreg_io == NULL) {
@@ -1791,11 +1826,11 @@ static void msm_batt_update_psy_status(void)
 
 				if(accel_vreg_io == NULL) {
 					pr_err("%s: accel_vreg_io null!\n", __func__);
-					return -1;
+					return;
 				}
 				if(vreg_set_level(accel_vreg_io, 1800) < 0) {
 					pr_err("%s: accel_vreg_io set level failed!\n", __func__);
-					return -1;
+					return;
 				}
 
 				vreg_disable(accel_vreg_io);
@@ -1815,12 +1850,15 @@ static void msm_batt_update_psy_status(void)
 	chg_current_adc = rep_batt_chg.v1.chg_current;
 	batt_id = rep_batt_chg.v1.batt_id;
 
+	//  Protecting the personal information : Google Logchecker issue
+	#ifndef PRODUCT_SHIP
 	pr_info("[BATT] %s: chg_current = %d, Temperature = %d, V_F = %d,  (from CP)\n", __func__, chg_current_adc, battery_temp_adc, batt_id);
+	#endif
 
 	if ( (msm_batt_info.batt_status == POWER_SUPPLY_STATUS_CHARGING) ||
 		(msm_batt_info.batt_recharging == 1) )
 	{
-		if (chg_current_adc < 30 | chg_current_adc > 900)
+		if (chg_current_adc < 30 || chg_current_adc > 900)
 			chg_current_adc = 0;
 	}
 	else
@@ -1847,7 +1885,7 @@ static void msm_batt_update_psy_status(void)
 	}
 #endif
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	if( system_rev <= 1 )
 	{
 		msm_batt_info.battery_temp_adc = 300;
@@ -1879,13 +1917,19 @@ static void msm_batt_update_psy_status(void)
 	if (msm_batt_info.charging_source != NO_CHG)
 #endif
 	{
+	//  Protecting the personal information : Google Logchecker issue
+        #ifndef PRODUCT_SHIP
 		pr_info("[BATT] %s: Voltage = %d, Soc = %d, temperature = %d, current = %d, Source = %d, Health = %d\n", 
 			__func__, msm_batt_info.battery_voltage, msm_batt_info.batt_capacity, msm_batt_info.battery_temp_adc, msm_batt_info.chg_current_adc, msm_batt_info.charging_source, msm_batt_info.batt_health);
+	#endif
 	}
 
 	if (status_changed)
 	{
+	//  Protecting the personal information : Google Logchecker issue
+        #ifndef PRODUCT_SHIP
 		pr_info("[BATT] %s: power_supply_changed !\n", __func__);
+	#endif
 		power_supply_changed(&msm_psy_batt);
 	}
 
@@ -2396,7 +2440,18 @@ static int msm_batt_get_charger_type(void)
 	int charger_type = CHARGER_TYPE_NONE;
 
 	charger_type = fsa9480_get_charger_status();
-
+	pr_info("[BATT]%s: 1 charger_type = %d \n", __func__,charger_type);
+#if defined(CONFIG_MACH_VITAL2) || defined(CONFIG_MACH_PREVAIL2)
+	if(charger_type == 1){
+		if (msm_batt_info.pdata->inform_charger_connection)
+			msm_batt_info.pdata->inform_charger_connection(true);
+	}else{
+		if (msm_batt_info.pdata->inform_charger_connection)
+			msm_batt_info.pdata->inform_charger_connection(false);
+	}
+	
+	pr_info("[BATT]%s: 2 charger_type = %d \n", __func__,charger_type);
+#endif
 	return charger_type;
 }
 
@@ -2520,7 +2575,8 @@ int batt_restart(void)
 }
 EXPORT_SYMBOL(batt_restart);
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 extern void fsa9480_irq_disable(int disable);
 #endif
 
@@ -2528,7 +2584,8 @@ static int msm_batt_cleanup(void)
 {
 	int rc = 0;
 
-	#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+	#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+		defined(CONFIG_MACH_PREVAIL2)
 		del_timer(&msm_batt_info.timer);
 		fsa9480_irq_disable(1);
 	#endif
@@ -2857,7 +2914,9 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 {
 	int rc;
 	struct msm_psy_batt_pdata *pdata = pdev->dev.platform_data;
-
+#if defined(CONFIG_MACH_VITAL2) || defined(CONFIG_MACH_PREVAIL2)
+	msm_batt_info.pdata = pdata;
+#endif
 	if (pdev->id != -1) {
 		dev_err(&pdev->dev,
 			"%s: MSM chipsets Can only support one"
@@ -3016,7 +3075,8 @@ static struct platform_driver msm_batt_driver = {
 	.suspend = msm_batt_suspend,
 	.resume = msm_batt_resume,		
 	.remove = __devexit_p(msm_batt_remove),
-#if !defined(CONFIG_MACH_CHIEF) && !defined(CONFIG_MACH_VITAL2)
+#if !defined(CONFIG_MACH_CHIEF) && !defined(CONFIG_MACH_VITAL2) && !defined (CONFIG_MACH_ROOKIE2) && \
+	!defined(CONFIG_MACH_PREVAIL2)
 	.shutdown = msm_batt_shutdown,
 #endif
 	.driver = {

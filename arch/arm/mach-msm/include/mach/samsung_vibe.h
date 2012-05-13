@@ -35,7 +35,8 @@
 
 #define VIBE_MAX_DEVICE_NAME_LENGTH			64
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 #define VIB_ON                              133
 #endif
 

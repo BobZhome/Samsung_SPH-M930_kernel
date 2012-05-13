@@ -206,9 +206,8 @@ static void kgsl_yamato_dump_regs(struct kgsl_device *device)
 static void dump_ib(struct kgsl_device *device, char* buffId, uint32_t pt_base,
 	uint32_t base_offset, uint32_t ib_base, uint32_t ib_size, bool dump)
 {
-	unsigned int memsize;
-	uint8_t *base_addr = kgsl_sharedmem_convertaddr(device, pt_base,
-		ib_base, &memsize);
+
+	uint8_t *base_addr = adreno_convertaddr(device, pt_base, ib_base, ib_size*sizeof(uint32_t));
 
 	if (base_addr && dump)
 		print_hex_dump(KERN_ERR, buffId, DUMP_PREFIX_OFFSET,
@@ -236,14 +235,12 @@ static void dump_ib1(struct kgsl_device *device, uint32_t pt_base,
 	int i, j;
 	uint32_t value;
 	uint32_t *ib1_addr;
-	unsigned int memsize;
-
+	
 	dump_ib(device, "IB1:", pt_base, base_offset, ib1_base,
 		ib1_size, dump);
 
 	/* fetch virtual address for given IB base */
-	ib1_addr = (uint32_t *)kgsl_sharedmem_convertaddr(device, pt_base,
-		ib1_base, &memsize);
+	ib1_addr = (uint32_t *)adreno_convertaddr(device, pt_base, ib1_base, ib1_size*sizeof(uint32_t));
 	if (!ib1_addr)
 		return;
 
@@ -413,7 +410,7 @@ static int kgsl_dump_yamato(struct kgsl_device *device)
 	const uint32_t *rb_vaddr;
 	int num_item = 0;
 	int read_idx, write_idx;
-	unsigned int ts_processed, rb_memsize;
+	unsigned int ts_processed;
 
 	static struct ib_list ib_list;
 
@@ -596,10 +593,15 @@ static int kgsl_dump_yamato(struct kgsl_device *device)
 
 	KGSL_LOG_DUMP("RB: rd_addr:%8.8x  rb_size:%d  num_item:%d\n",
 		cp_rb_base, rb_count<<2, num_item);
-	rb_vaddr = (const uint32_t *)kgsl_sharedmem_convertaddr(device, pt_base,
-					cp_rb_base, &rb_memsize);
+
+	if(yamato_device->ringbuffer.buffer_desc.gpuaddr != cp_rb_base)	
+		KGSL_LOG_POSTMORTEM_WRITE("rb address mismatch, should be 0x%08x\n",
+		                                				yamato_device->ringbuffer.buffer_desc.gpuaddr);
+
+	rb_vaddr = yamato_device->ringbuffer.buffer_desc.hostptr;
+	
 	if (!rb_vaddr) {
-		KGSL_LOG_POSTMORTEM_WRITE("Can't fetch vaddr for CP_RB_BASE\n");
+		KGSL_LOG_POSTMORTEM_WRITE("rb has no kernel mapping!\n");
 		goto error_vfree;
 	}
 

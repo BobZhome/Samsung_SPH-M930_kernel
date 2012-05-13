@@ -188,6 +188,12 @@ config SMB137B_CHARGER
 	 To compile this driver as a module, choose M here: the module will
 	 be called smb137b.
 
+config CHARGER_SMB328A
+	bool "Enable SMB328A charger driver"
+	default n
+	help
+	  Say Y here to enable support for charger with SMB328A chip
+
 config BATTERY_MSM_FAKE
 	tristate "Fake MSM battery"
 	depends on ARCH_MSM && BATTERY_MSM

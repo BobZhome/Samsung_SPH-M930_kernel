@@ -86,7 +86,7 @@
 
 #include <mach/hardware.h>
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 #define FEATURE_ADC_READ
 #endif
 
@@ -474,7 +474,7 @@ static int h2w_probe(struct platform_device *pdev)
 		pr_err("kzalloc couldn't allocate memory\n");
 		return -ENOMEM;
 	}
-#ifdef 	CONFIG_MACH_VITAL2
+#if defined 	CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
     if(system_rev >= 2)
 		detect_type	= JACK_ACTIVE_HIGH;
 	else

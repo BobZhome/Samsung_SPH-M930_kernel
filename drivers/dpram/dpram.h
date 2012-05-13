@@ -177,6 +177,8 @@
 
 //#define DPRAM_PHONE_ON_NORMAL	0
 //#define DPRAM_PHONE_ON_LPM		1
+
+//#define PDP_CIQ_ENABLED
 #endif
 
 /*

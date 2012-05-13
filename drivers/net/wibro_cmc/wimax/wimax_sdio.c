@@ -29,6 +29,7 @@
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/platform_device.h>
+#include <linux/mutex.h>
 
 /* driver Information */
 #define WIMAX_DRIVER_VERSION_STRING "3.0.2"
@@ -472,6 +473,8 @@ static int wimax_probe(struct platform_device *pdev)
 	g_pdata =
 		(struct wimax732_platform_data	*)(pdev->dev.platform_data);
 
+	mutex_init(&g_pdata->g_cfg->poweroff_mutex);
+
 	g_pdata->g_cfg->probe_complete = TRUE;
 	g_pdata->g_cfg->card_removed = TRUE;
 
@@ -491,6 +494,7 @@ static int wimax_remove(struct platform_device *pdev)
 {
 	dump_debug("SDIO driver Uninstall");
 
+	mutex_destroy(&g_pdata->g_cfg->poweroff_mutex);
 	/* destroy wake locks */
 	wake_lock_destroy(&g_pdata->g_cfg->wimax_wake_lock);
 	wake_lock_destroy(&g_pdata->g_cfg->wimax_rxtx_lock);

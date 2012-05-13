@@ -6,6 +6,8 @@ KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ
 KERNEL_CONFIG := $(KERNEL_OUT)/.config
 TARGET_PREBUILT_INT_KERNEL := $(KERNEL_OUT)/arch/arm/boot/zImage
 KERNEL_HEADERS_INSTALL := $(KERNEL_OUT)/usr
+KERNEL_MODULES_INSTALL := system
+KERNEL_MODULES_OUT := $(TARGET_OUT)/lib/modules
 
 ifeq ($(TARGET_USES_UNCOMPRESSED_KERNEL),true)
 $(info Using uncompressed kernel)
@@ -18,6 +20,22 @@ file := $(TARGET_OUT)/lib/modules/oprofile.ko
 ALL_PREBUILT += $(file)
 $(file) : $(TARGET_PREBUILT_KERNEL) | $(ACP)
 	$(transform-prebuild-to-target)
+	
+#define mv-modules
+#mdpath=`find $(KERNEL_MODULES_OUT) -type f -name modules.dep`;\
+#if [ "$$mdpath" != "" ];then\
+#mpath=`dirname $$mdpath`;\
+#ko=`find $$mpath/kernel -type f -name *.ko`;\
+#for i in $$ko; do mv $$i $(KERNEL_MODULES_OUT)/; done;\
+#fi
+#endef
+
+#define clean-module-folder
+#mdpath=`find $(KERNEL_MODULES_OUT) -type f -name modules.dep`;\
+#if [ "$$mdpath" != "" ];then\
+#mpath=`dirname $$mdpath`; rm -rf $$mpath;\
+#fi
+#endef
 
 $(KERNEL_OUT):
 	mkdir -p $(KERNEL_OUT)

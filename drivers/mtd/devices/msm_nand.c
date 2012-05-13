@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -69,7 +69,8 @@ unsigned crci_mask;
 #define VERBOSE 0
 
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 unsigned cp_area_start_page = 0;
 unsigned cp_area_end_page = 0;
 
@@ -534,7 +535,8 @@ uint32_t flash_onfi_probe(struct msm_nand_chip *chip)
 		return err;
 	}
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	for ( i = 0 ; i < msm_nand_data.nr_parts ; i++) {
 		if (!strcmp(msm_nand_data.parts[i].name , "parameter")) {
 			boot_param_start_block = msm_nand_data.parts[i].offset;
@@ -826,7 +828,8 @@ static int msm_nand_read_oob(struct mtd_info *mtd, loff_t from,
 	unsigned cwperpage;
 	unsigned modem_partition = 0;
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	//For fota enginge access to cp partition
 	if( (from >= cp_area_start_page && from <= cp_area_end_page) ||
 		(from >= param_start_page && from <= param_end_page))
@@ -1116,12 +1119,20 @@ static int msm_nand_read_oob(struct mtd_info *mtd, loff_t from,
 
 			}
 			if (ops->oobbuf) {
+				dma_sync_single_for_cpu(chip->dev,
+				oob_dma_addr_curr - (ops->ooblen - oob_len),
+				ops->ooblen - oob_len, DMA_BIDIRECTIONAL);
+
 				for (n = 0; n < ops->ooblen; n++) {
 					if (ops->oobbuf[n] != 0xff) {
 						pageerr = rawerr;
 						break;
 					}
 				}
+
+				dma_sync_single_for_device(chip->dev,
+				oob_dma_addr_curr - (ops->ooblen - oob_len),
+				ops->ooblen - oob_len, DMA_BIDIRECTIONAL);
 			}
 		}
 		if (pageerr) {
@@ -1407,7 +1418,8 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 		/* config ebi2 cfg reg for pingpong ( 0xA000_0004 ) */
 		dma_buffer->data.ebi2_cfg = 0x4010080;
 		dma_buffer->data.ebi2_cfg_default = 0x4010080;
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 		dma_buffer->data.ebi2_chip_select_cfg0 = 0x00000809;
 		dma_buffer->data.default_ebi2_chip_select_cfg0 = 0x00000809;
 #else
@@ -1886,12 +1898,20 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 
 			}
 			if (ops->oobbuf) {
+				dma_sync_single_for_cpu(chip->dev,
+				oob_dma_addr_curr - (ops->ooblen - oob_len),
+				ops->ooblen - oob_len, DMA_BIDIRECTIONAL);
+
 				for (n = 0; n < ops->ooblen; n++) {
 					if (ops->oobbuf[n] != 0xff) {
 						pageerr = rawerr;
 						break;
 					}
 				}
+
+				dma_sync_single_for_device(chip->dev,
+				oob_dma_addr_curr - (ops->ooblen - oob_len),
+				ops->ooblen - oob_len, DMA_BIDIRECTIONAL);
 			}
 		}
 		if (pageerr) {
@@ -2010,10 +2030,11 @@ msm_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
 	return ret;
 }
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 void msm_read_param(struct samsung_parameter *param_data)
 {
-#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	if(system_rev >= 5)
 		return;
 #endif
@@ -2041,7 +2062,7 @@ EXPORT_SYMBOL(msm_read_param);
 
 void msm_read_boot_param(struct BOOT_PARAM *param_data)
 {
-#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	if(system_rev >= 5)
 		return;
 #endif
@@ -2105,7 +2126,8 @@ msm_nand_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 	unsigned cwperpage;
 	unsigned modem_partition = 0;;
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	//For fota enginge access to cp partition
 	if( (to >= cp_area_start_page && to <= cp_area_end_page) ||
 		(to >= param_start_page && to <= param_end_page)) //CHJ
@@ -2551,7 +2573,8 @@ msm_nand_write_oob_dualnandc(struct mtd_info *mtd, loff_t to,
 	wait_event(chip->wait_queue, (dma_buffer =
 			msm_nand_get_dma_buffer(chip, sizeof(*dma_buffer))));
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	dma_buffer->data.ebi2_chip_select_cfg0 = 0x00000809;
 	dma_buffer->data.default_ebi2_chip_select_cfg0 = 0x00000809;
 #else
@@ -3434,10 +3457,11 @@ msm_nand_erase_dualnandc(struct mtd_info *mtd, struct erase_info *instr)
 	return err;
 }
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 void msm_write_param(struct samsung_parameter *param_data)
 {
-#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	if(system_rev >= 5)
 		return;
 #endif
@@ -3476,7 +3500,7 @@ EXPORT_SYMBOL(msm_write_param);
 
 void msm_write_boot_param(struct BOOT_PARAM *param_data)
 {
-#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	if(system_rev >= 5)
 		return;
 #endif
@@ -3745,7 +3769,8 @@ msm_nand_block_isbad_dualnandc(struct mtd_info *mtd, loff_t ofs)
 	dma_buffer->data.result[1].flash_status = 0xeeeeeeee;
 	dma_buffer->data.result[1].buffer_status = 0xeeeeeeee;
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	dma_buffer->data.ebi2_chip_select_cfg0 = 0x00000809;
 	dma_buffer->data.default_ebi2_chip_select_cfg0 = 0x00000809;
 #else
@@ -6899,7 +6924,8 @@ int msm_nand_scan(struct mtd_info *mtd, int maxchips)
 		return -ENODEV;
 	}
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	//AP partition------------------------------------------------
 	CFG0_A = (((mtd_writesize >> 9)-1) << 6) /* 4/8 cw/pg for 2/4k */
 		|  (516 <<  9)  /* 516 user data bytes */
@@ -7168,7 +7194,8 @@ static int __devinit msm_nand_probe(struct platform_device *pdev)
 		goto no_dual_nand_ctlr_support;
 	ebi2_register_base = res->start;
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	dual_nand_ctlr_present = 0; // EBI2_CS1 for SIDE_LOADING CHIP
 #else	
 	dual_nand_ctlr_present = 1;

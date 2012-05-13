@@ -60,7 +60,8 @@ static const char longname[] = "Gadget Android";
 #define VENDOR_ID		0x18D1
 #define PRODUCT_ID		0x0001
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || \
+	defined(CONFIG_MACH_PREVAIL2)
 
 struct usb_mode_func {
     char name[20];
@@ -100,13 +101,10 @@ struct android_dev {
 
 	int product_id;
 	int version;
-	int enable_rndis_msc;
-
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+	
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || \
+	defined(CONFIG_MACH_PREVAIL2)
 	int current_usb_mode;
-	int enabled_functions;
-	bool debugging_usb_mode; // phill-it: for rndis issue
-	bool stop_rndis;         // phill-it: for rndis issue
 #endif
 };
 
@@ -266,6 +264,74 @@ static int product_has_function(struct android_usb_product *p,
 	return 0;
 }
 
+#ifdef CONFIG_USB_SAMSUNG_DRIVER
+static int product_matches_functions(struct android_usb_product *p)
+{
+	struct usb_function		*f;
+	list_for_each_entry(f, &android_config_driver.functions, list) {
+		if(f->hidden!=1 && !product_has_function(p,f))
+			return 0;
+	}
+	return 1;
+}
+static int product_function_match_count(struct android_usb_product *p)
+{
+	struct usb_function		*f;
+	int count = 0;
+	list_for_each_entry(f, &android_config_driver.functions, list) {
+		if(f->hidden!=1 && product_has_function(p,f))
+			count++;
+	}
+	return count;
+}
+
+static struct android_usb_product* android_get_best_fit_product(struct android_dev *dev, struct usb_function *f, int enable)
+{
+	struct android_usb_product *p = dev->products;
+	int count = dev->num_products;
+	struct android_usb_product* best_product = NULL;
+	int most_match = 0;
+	int match_count = 0;
+	int i;
+
+	if (p) {
+		/* try to find a product that has all the enabled functions in it */
+		for (i = 0; i < count; i++, p++) {
+			if (product_matches_functions(p))
+				return p;
+		}
+
+		/* rewind */
+		p = dev->products;
+		
+		if(enable) {
+			/* choose a product id based on the enabling function */
+			pr_info("[%s] search for product id that has %s\n", __func__, f->name);
+			for (i = 0; i < count; i++, p++) {
+				if(product_has_function(p,f))
+					return p;
+			}
+		} else {
+			/* choose a product id based on the number of functions match */
+			pr_info("[%s] search for best fit product id\n", __func__);
+			for (i = 0; i < count; i++, p++) {
+				match_count = product_function_match_count(p);
+				if(match_count > most_match) {
+					most_match = match_count;
+					best_product = p;
+				}
+			}
+			if(best_product)
+				return best_product;
+		}
+	}
+
+	pr_info("[%s] Not found. Use default PID=%x\n", __func__, dev->product_id);
+	/* use default product ID */
+	return dev;
+}
+
+#else
 static int product_matches_functions(struct android_usb_product *p)
 {
 	struct usb_function		*f;
@@ -275,6 +341,7 @@ static int product_matches_functions(struct android_usb_product *p)
 	}
 	return 1;
 }
+#endif
 
 static int get_product_id(struct android_dev *dev)
 {
@@ -288,95 +355,22 @@ static int get_product_id(struct android_dev *dev)
 				return p->product_id;
 		}
 	}
+
+	pr_info("[usb] get_product_id failed. use default product_id %x", dev->product_id);
 	/* use default product ID */
 	return dev->product_id;
 }
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || \
+	defined(CONFIG_MACH_PREVAIL2)
 int android_usb_get_current_mode(void) {
     return _android_dev->current_usb_mode;
 }
 
 void android_usb_switch(int mode)
 {
-    struct android_dev *dev = _android_dev;
-    int enabled_functions = dev->enabled_functions;
-    int inaskon = mode & USB_MODE_ASKON;
-
-    // special modes
-    if (mode & USB_MODE_RNDIS) {
-        printk("[%s:%d] rndis mode\n", __func__, __LINE__);
-
-        mode = USB_MODE_RNDIS;
-#if 0
-        if (dev->enable_rndis_msc) {
-            mode |= enabled_functions & (USB_MODE_ADB | USB_MODE_UMS);
-        } else {
-            mode |= enabled_functions & (USB_MODE_ADB);
-        }
-#endif
-    } else if (mode & USB_MODE_MTP) {
-        // adb has preference over mtp
-        if (enabled_functions & USB_MODE_ADB) {
-            printk("[%s:%d] MTP Mode with ADB (disable MTP)\n", __func__, __LINE__);
-            mode = enabled_functions & ~USB_MODE_MTP;
-        } else {
-            printk("[%s:%d] MTP Mode\n", __func__, __LINE__);
-            mode = USB_MODE_MTP;
-        }
-    } else if (mode & USB_MODE_UMS) {
-        printk("[%s:%d] UMS Mode\n", __func__, __LINE__);
-        mode |= enabled_functions;
-    }
-
-    if (inaskon) mode |= inaskon;
-
-    if (mode != dev->current_usb_mode) {
-        int product_id;
-        struct usb_function		*func;
-
-        dev->current_usb_mode = mode;
-
-        printk("[%s:%d] funcs[%x]: ", __func__, __LINE__, mode);
-        list_for_each_entry(func, &android_config_driver.functions, list) {
-            if (func) {
-                func->hidden = !(mode & func_to_usb_mode(func->name));
-                printk("%s=%d ",func->name, !func->hidden);
-            }
-        }
-        printk("\n");
-
-        product_id = get_product_id(dev);
-        device_desc.idProduct = __constant_cpu_to_le16(product_id);
-
-        if (dev->cdev){
-			dev->cdev->desc.idProduct = device_desc.idProduct;
-			printk("[%s:%d] VendorId=%04X ProductId=%04X\n", __func__, __LINE__, device_desc.idVendor, device_desc.idProduct);
-
-			if (mode & USB_MODE_RNDIS){
-				#ifdef CONFIG_USB_ANDROID_RNDIS_WCEIS
-				dev->cdev->desc.bDeviceClass = USB_CLASS_COMM;
-				dev->cdev->desc.bDeviceSubClass      = 0x00;
-				dev->cdev->desc.bDeviceProtocol      = 0x00;
-				#else
-				dev->cdev->desc.bDeviceClass = USB_CLASS_COMM;
-				#endif
-				}
-			else {
-				dev->cdev->desc.bDeviceClass = USB_CLASS_PER_INTERFACE;
-				dev->cdev->desc.bDeviceSubClass      = 0;
-				dev->cdev->desc.bDeviceProtocol      = 0;
-				}
-        	}
-
-        /* force reenumeration */
-        if (dev->cdev && dev->cdev->gadget &&
-                dev->cdev->gadget->speed != USB_SPEED_UNKNOWN) {
-            usb_gadget_disconnect(dev->cdev->gadget);
-            msleep(10);
-            usb_gadget_connect(dev->cdev->gadget);
-        }
-    }
+	pr_info("[%s] mode=%d\n", __func__, mode);
+	_android_dev->current_usb_mode = mode;
 }
 
 #endif
@@ -469,7 +463,6 @@ void android_register_function(struct android_usb_function *f)
 	pr_debug("%s: %s\n", __func__, f->name);
 	list_add_tail(&f->list, &_functions);
 	_registered_function_count++;
-
 	/* bind our functions if they have all registered
 	 * and the main driver has bound.
 	 */
@@ -479,6 +472,51 @@ void android_register_function(struct android_usb_function *f)
 	}
 }
 
+
+#ifdef CONFIG_USB_SAMSUNG_DRIVER
+static void android_set_function_mask(struct android_usb_product *up)
+{
+	int index;
+	struct usb_function *func;
+
+//  Protecting the personal information : Google Logchecker issue
+    #ifndef PRODUCT_SHIP
+	pr_info("[%s] pid=%x\n", __func__, up->product_id);
+    #endif
+    
+	list_for_each_entry(func, &android_config_driver.functions, list) {
+		func->disabled = 1;
+		for (index = 0; index < up->num_functions; index++) {
+			if (!strcmp(up->functions[index], func->name)) {
+				func->disabled = 0;
+				pr_info("%s\n", func->name);
+			}
+		}
+	}
+}
+static void android_set_default_mask(struct android_usb_product *up)
+{
+	int index;
+	struct usb_function *func;
+
+//  Protecting the personal information : Google Logchecker issue
+    #ifndef PRODUCT_SHIP
+	pr_info("[%s] pid=%x enabled functions : ", __func__, up->product_id);
+    #endif
+
+	list_for_each_entry(func, &android_config_driver.functions, list) {
+		func->disabled = 1;
+		func->hidden = 1;//-1; // hidden not used when set -1
+		for (index = 0; index < up->num_functions; index++) {
+			if (!strcmp(up->functions[index], func->name)) {
+				func->disabled = 0;
+				pr_info("%s ", func->name);
+			}
+		}
+	}
+	pr_info("\n");
+}
+#else
 /**
  * android_set_function_mask() - enables functions based on selected pid.
  * @up: selected product id pointer
@@ -487,44 +525,78 @@ void android_register_function(struct android_usb_function *f)
  */
 static void android_set_function_mask(struct android_usb_product *up)
 {
- int index, found = 0;
- struct usb_function *func;
- struct android_dev *dev = _android_dev;
+	int index, found = 0;
+	struct usb_function *func;
 
-  list_for_each_entry(func, &android_config_driver.functions, list) {
+	list_for_each_entry(func, &android_config_driver.functions, list) {
+		/* adb function enable/disable handled separetely */
+		if (!strcmp(func->name, "adb"))
+			continue;
 
-  #if 1 // phill-it : for rndis issue
-  /* adb function enable/disable handled separetely */
-  if (dev->stop_rndis && dev->debugging_usb_mode) {
-    if (!strcmp(func->name, "adb")){
-       usb_function_set_enabled(func, 1);
-      continue;
-     }
-    }
- #endif
+		for (index = 0; index < up->num_functions; index++) {
+			if (!strcmp(up->functions[index], func->name)) {
+				found = 1;
+				break;
+			}
+		}
 
-  for (index = 0; index < up->num_functions; index++) {
-   if (!strcmp(up->functions[index], func->name)) {
-    found = 1;
-    break;
-   }
-  }
+		if (found) { /* func is part of product. */
+			/* if func is disabled, enable the same. */
+			if (func->disabled)
+				usb_function_set_enabled(func, 1);
+			found = 0;
+		} else { /* func is not part if product. */
+			/* if func is enabled, disable the same. */
+			if (!func->disabled)
+				usb_function_set_enabled(func, 0);
+		}
+	}
+}
+#endif
 
-  if (found) { /* func is part of product. */
-   /* if func is disabled, enable the same. */
-   if (func->disabled)
-    usb_function_set_enabled(func, 1);
-   found = 0;
-  } else { /* func is not part if product. */
-   /* if func is enabled, disable the same. */
-   if (!func->disabled)
-    usb_function_set_enabled(func, 0);
-  }
- }
+
+#ifdef CONFIG_USB_SAMSUNG_DRIVER
+static void android_set_default_product(int pid)
+{
+	struct android_dev *dev = _android_dev;
+	struct android_usb_product *up = dev->products;
+	int index;
+
+	for (index = 0; index < dev->num_products; index++, up++) {
+		if (pid == up->product_id)
+			break;
+	}
+	android_set_default_mask(up);
 }
 
+static void android_set_product(struct android_usb_product* product)
+{
+	struct android_dev *dev = _android_dev;
+	struct android_usb_product *up = dev->products;
+	int index;
+	struct usb_function *func;
 
+	for (index = 0; index < dev->num_products; index++, up++) {
+		if (product == up)
+			break;
+	}
+	
+	android_set_function_mask(up);
+	dev->cdev->desc.bDeviceClass = up->device_class;
+	dev->cdev->desc.bDeviceSubClass = up->device_subclass;
+	dev->cdev->desc.bDeviceProtocol = up->device_protocol;
 
+//  Protecting the personal information : Google Logchecker issue
+    #ifndef PRODUCT_SHIP
+	pr_info("[%s] pid=%x class=%x subclass=%x prot=%x\n", __func__, 
+		up->product_id,
+		up->device_class,
+		up->device_subclass,
+		up->device_protocol);
+    #endif
+    
+}
+#else
 /**
  * android_set_defaut_product() - selects default product id and enables
  * required functions
@@ -545,6 +617,7 @@ static void android_set_default_product(int pid)
 	}
 	android_set_function_mask(up);
 }
+#endif
 
 /**
  * android_config_functions() - selects product id based on function need
@@ -577,6 +650,36 @@ static void android_config_functions(struct usb_function *f, int enable)
 }
 #endif
 
+#ifdef CONFIG_USB_SAMSUNG_DRIVER
+void android_enable_function(struct usb_function *f, int enable)
+{
+	struct android_dev *dev = _android_dev;
+	int disable = !enable;
+	struct android_usb_product* product;
+	struct usb_function *func;
+
+	pr_info("[%s] android_enable_function(%s,%d)", __func__, f->name, enable);
+
+	if (!!f->hidden != disable) {
+		usb_function_set_enabled(f, !disable);
+		f->hidden = disable;
+
+		product = android_get_best_fit_product(dev, f, enable);
+
+//  Protecting the personal information : Google Logchecker issue
+        #ifndef PRODUCT_SHIP 		
+		pr_info("[%s] pid=%x", __func__, product->product_id);
+	    #endif	
+		android_set_product(product);
+
+		device_desc.idProduct = __constant_cpu_to_le16(product->product_id);
+		if (dev->cdev)
+			dev->cdev->desc.idProduct = device_desc.idProduct;
+
+		usb_composite_force_reset(dev->cdev);
+	}
+}
+#else
 void android_enable_function(struct usb_function *f, int enable)
 {
 	struct android_dev *dev = _android_dev;
@@ -588,7 +691,6 @@ void android_enable_function(struct usb_function *f, int enable)
 
 #ifdef CONFIG_USB_ANDROID_RNDIS
 		if (!strcmp(f->name, "rndis")) {
-			int mode;
 
 			/* We need to specify the COMM class in the device descriptor
 			 * if we are using RNDIS.
@@ -601,49 +703,24 @@ void android_enable_function(struct usb_function *f, int enable)
 #else
 				dev->cdev->desc.bDeviceClass = USB_CLASS_COMM;
 #endif
-				mode = USB_MODE_RNDIS;
 			} else {
 				dev->cdev->desc.bDeviceClass = USB_CLASS_PER_INTERFACE;
 				dev->cdev->desc.bDeviceSubClass      = 0;
 				dev->cdev->desc.bDeviceProtocol      = 0;
-
-				if (dev->debugging_usb_mode)
-					mode = USB_MODE_UMS | USB_MODE_ADB;
-				else
-					mode = USB_MODE_UMS;
-				dev->stop_rndis = true;
 			}
-			dev->current_usb_mode = mode;
 
 			android_config_functions(f, enable);
-			dev->stop_rndis = false;
 		}
 #endif
-		if (!strcmp(f->name, "adb")) {
-			if (enable) {
-				dev->current_usb_mode |= USB_MODE_ADB;
-				dev->debugging_usb_mode = true;
-			}
-			else {
-				dev->current_usb_mode &= ~USB_MODE_ADB;
-				dev->debugging_usb_mode = false;
-			}
-			kobject_uevent(&f->dev->kobj, KOBJ_CHANGE);
-			if (dev->current_usb_mode & USB_MODE_RNDIS)
-				return;
-		}
 
 		product_id = get_product_id(dev);
 		device_desc.idProduct = __constant_cpu_to_le16(product_id);
-		if (dev->cdev){
+		if (dev->cdev)
 			dev->cdev->desc.idProduct = device_desc.idProduct;
-			if (!strcmp(f->name, "adb")) // phill-it: for adb issue (tray icon)
-				usb_composite_force_reset_adb(dev->cdev);
-			else
-				usb_composite_force_reset(dev->cdev);
-		}
+		usb_composite_force_reset(dev->cdev);
 	}
 }
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 static int android_debugfs_open(struct inode *inode, struct file *file)
@@ -714,9 +791,17 @@ void get_usb_serial(char *usb_serial_number)
 	unique_serial_number = (system_serial_high << 16) + system_serial_low;
 	//unique_serial_number = random32() >> 8;
 
+#if defined (CONFIG_MACH_VITAL2_BST)
+	/* change the last bit of the serial number to force a new 
+	 * driver installation */
+	unique_serial_number = unique_serial_number^0x1;
+#endif
+ 
 #if defined (CONFIG_MACH_CHIEF)
 	sprintf(temp_serial_number,"D600%08X",unique_serial_number);
-#else
+#elif  defined (CONFIG_MACH_ROOKIE2)
+	sprintf(temp_serial_number,"R750%08X",unique_serial_number);
+#else	
 	sprintf(temp_serial_number,"M930%08X",unique_serial_number);
 #endif
 
@@ -782,19 +867,14 @@ static int __init android_probe(struct platform_device *pdev)
 		if (pdata->serial_number)
 			strings_dev[STRING_SERIAL_IDX].s = pdata->serial_number;
 #endif
-		if (pdata->enable_rndis_msc)
-			dev->enable_rndis_msc = pdata->enable_rndis_msc;
 
 	}
 	device_desc.bDeviceClass         = USB_CLASS_COMM;
 	device_desc.bDeviceSubClass      = 0x00;
 	device_desc.bDeviceProtocol      = 0x00;
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
-    dev->enabled_functions = 0x0;
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 ||defined CONFIG_MACH_ROOKIE2
     dev->current_usb_mode = 0x0;
-	dev->debugging_usb_mode = false;
-	dev->stop_rndis = false;
 #endif
 
 #ifdef CONFIG_DEBUG_FS
