@@ -82,9 +82,9 @@ typedef unsigned char		BOOLEAN;
 //============================================================
 
 // For printing debug information. ( Please check 'printing function' )
-#define MELFAS_ENABLE_DBG_PRINT											1
+#define MELFAS_ENABLE_DBG_PRINT											0
 
-#define MELFAS_ENABLE_DBG_PROGRESS_PRINT								0
+#define MELFAS_ENABLE_DBG_PROGRESS_PRINT								1
 
 // For delay function test. ( Disable after Porting is finished )
 #define MELFAS_ENABLE_DELAY_TEST										1
@@ -213,6 +213,7 @@ typedef unsigned char		BOOLEAN;
 #define MCSDL_DELAY_60MS                            60000
 #define MCSDL_DELAY_40US                               40
 #define MCSDL_DELAY_300US                             300
+#define MCSDL_DELAY_100MS                          100000
 //end add delay
 
 //============================================================

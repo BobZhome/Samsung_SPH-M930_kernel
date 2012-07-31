@@ -190,7 +190,7 @@ static void set_pmic_vibrator(int on)
       int temp_loop_max = (int)((pwd_generate_time *1000)/50) ;                 // ms단위 PWM 주기 50us
 #endif
 	  
-	printk("[VIB] %s, input : %s\n",__func__,on ? "ON":"OFF");
+	//printk("[VIB] %s, input : %s\n",__func__,on ? "ON":"OFF"); Fixing Log Checker issues
 	if (on) {
 #if defined CONFIG_MACH_CHIEF
 		if((system_rev < 8) || (system_rev > 9)) {
@@ -208,7 +208,7 @@ static void set_pmic_vibrator(int on)
 			}
 #endif
 		}
-#elif defined CONFIG_MACH_VITAL2
+#elif defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 		if(system_rev >= 4) {
 			clk_enable(android_vib_clk);
 			gpio_set_value(VIB_ON, VIBRATION_ON);
@@ -227,7 +227,7 @@ static void set_pmic_vibrator(int on)
 				gpio_set_value(VIB_ON, VIBRATION_OFF);
 				gpio_set_value(PWM_GPIO_PORT, VIBRATION_OFF);
 			}
-#elif defined CONFIG_MACH_VITAL2
+#elif defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 			if(system_rev >= 4) {
 				gpio_set_value(VIB_ON, VIBRATION_OFF);
 				clk_disable(android_vib_clk);
@@ -282,15 +282,21 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 	hrtimer_cancel(&vibe_timer);
 
 	if (value == 0) {
+//  Protecting the personal information : Google Logchecker issue
+#ifndef 	PRODUCT_SHIP
 		printk("[VIB] OFF\n");
+#endif
 		pmic_vibrator_off();
 	}
 	else {
 
 		if(value < 0)
 			value = ~value;
-		printk("[VIB] ON, %d ms\n",value);
 
+//  Protecting the personal information : Google Logchecker issue
+#ifndef 	PRODUCT_SHIP
+		printk("[VIB] ON, %d ms\n",value);
+#endif
 		value = (value > 15000 ? 15000 : value);
 
 #ifndef TEMP_PWM_GENERATE
@@ -328,7 +334,7 @@ static enum hrtimer_restart vibrator_timer_func(struct hrtimer *timer)
 #else
 		unsigned int remain;
 
-		printk("[VIB] %s\n",__func__);
+		//printk("[VIB] %s\n",__func__); Fixing Log Checker issues
 		if(hrtimer_active(&vibe_timer)) {
 				ktime_t r = hrtimer_get_remaining(&vibe_timer);
 				remain=r.tv.sec * 1000000 + r.tv.nsec;
@@ -336,7 +342,7 @@ static enum hrtimer_restart vibrator_timer_func(struct hrtimer *timer)
 				if(r.tv.sec < 0) {
 						remain = 0;
 				}
-				printk("[VIB] hrtimer active, remain:%d\n",remain);
+				//printk("[VIB] hrtimer active, remain:%d\n",remain);  Fixing Log Checker issues
 				if(!remain) 
 					pmic_vibrator_off();
 		} else {
@@ -381,7 +387,7 @@ static int __devinit msm_vibrator_probe(struct platform_device *pdev)
 	if ((system_rev < 8) || (system_rev > 9)) {
 		vibe_set_pwm_freq(216);
 	}
-#elif defined CONFIG_MACH_VITAL2
+#elif defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	if(system_rev >= 4) {
 		vibe_set_pwm_freq(216);
 	}
@@ -396,7 +402,11 @@ static int __init msm_init_pmic_vibrator(void)
 
 	nRet = platform_driver_register(&msm_vibrator_platdrv);
 
+//  Protected the personal information : Google logchecker issue
+#ifndef     PRODUCT_SHIP
 	printk("[VIB] platform driver register result : %d\n",nRet);
+#endif
+//
 	if (nRet)
 	{ 
 		printk("[VIB] platform_driver_register failed\n");

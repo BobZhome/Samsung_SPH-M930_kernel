@@ -1079,6 +1079,19 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	var->xres_virtual = panel_info->xres;
 	var->yres_virtual = panel_info->yres * mfd->fb_page;
 	var->bits_per_pixel = bpp * 8;	/* FrameBuffer color depth */
+	if (mfd->dest == DISPLAY_LCD) {
+		var->reserved[4] = panel_info->lcd.refx100 / 100;
+	} else {
+		var->reserved[4] = panel_info->clk_rate /
+			((panel_info->lcdc.h_back_porch +
+			  panel_info->lcdc.h_front_porch +
+			  panel_info->lcdc.h_pulse_width +
+			  panel_info->xres) *
+			 (panel_info->lcdc.v_back_porch +
+			  panel_info->lcdc.v_front_porch +
+			  panel_info->lcdc.v_pulse_width +
+			  panel_info->yres));
+	}
 		/*
 		 * id field for fb app
 		 */
@@ -1178,7 +1191,27 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	else {
 		if (!load_565rle_image_onfb( "SPH-M930BST.rle",0,0)) ;
 	}
-#elif CONFIG_MACH_VITAL2
+#elif CONFIG_MACH_VITAL2 
+	else {
+		extern unsigned int customer_binary;
+		if(customer_binary){
+			load_565rle_image_onfb( "SPH-M930_ROOTING.rle",0,0);
+		}
+		else{
+			load_565rle_image_onfb( "SPH-M930.rle",0,0);
+		}
+	}
+	#elif CONFIG_MACH_ROOKIE2 
+	else {
+		extern unsigned int customer_binary;
+		if(customer_binary){
+			load_565rle_image_onfb( "SCH-R750_ROOTING.rle",0,0);
+		}
+		else{
+			load_565rle_image_onfb( "SCH-R750.rle",0,0);
+		}
+	}
+#elif CONFIG_MACH_PREVAIL2 
 	else {
 		extern unsigned int customer_binary;
 		if(customer_binary){

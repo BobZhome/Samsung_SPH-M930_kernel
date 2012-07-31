@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/smd_rpcrouter.c
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2007-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2007-2011, Code Aurora Forum. All rights reserved.
  * Author: San Mehat <san@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -40,6 +40,7 @@
 #include <linux/platform_device.h>
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
+#include <linux/ratelimit.h>
 
 #include <asm/byteorder.h>
 
@@ -68,55 +69,55 @@ static int smd_rpcrouter_debug_mask;
 module_param_named(debug_mask, smd_rpcrouter_debug_mask,
 		   int, S_IRUGO | S_IWUSR | S_IWGRP);
 
-#define DIAG(x...) printk(KERN_ERR "[RR] ERROR " x)
+#define DIAG(x...) pr_err("[RR] ERROR " x)
 
 #if defined(CONFIG_MSM_ONCRPCROUTER_DEBUG)
 #define D(x...) do { \
 if (smd_rpcrouter_debug_mask & RTR_DBG) \
-	printk(KERN_ERR x); \
+	pr_info_ratelimited(x); \
 } while (0)
 
 #define RR(x...) do { \
 if (smd_rpcrouter_debug_mask & R2R_MSG) \
-	printk(KERN_ERR "[RR] "x); \
+	pr_info_ratelimited("[RR] "x); \
 } while (0)
 
 #define RAW(x...) do { \
 if (smd_rpcrouter_debug_mask & R2R_RAW) \
-	printk(KERN_ERR "[RAW] "x); \
+	pr_info_ratelimited("[RAW] "x); \
 } while (0)
 
 #define RAW_HDR(x...) do { \
 if (smd_rpcrouter_debug_mask & R2R_RAW_HDR) \
-	printk(KERN_ERR "[HDR] "x); \
+	pr_info_ratelimited("[HDR] "x); \
 } while (0)
 
 #define RAW_PMR(x...) do { \
 if (smd_rpcrouter_debug_mask & RAW_PMR) \
-	printk(KERN_ERR "[PMR] "x); \
+	pr_info_ratelimited("[PMR] "x); \
 } while (0)
 
 #define RAW_PMR_NOMASK(x...) do { \
-	printk(KERN_ERR "[PMR] "x); \
+	pr_info_ratelimited("[PMR] "x); \
 } while (0)
 
 #define RAW_PMW(x...) do { \
 if (smd_rpcrouter_debug_mask & RAW_PMW) \
-	printk(KERN_ERR "[PMW] "x); \
+	pr_info_ratelimited("[PMW] "x); \
 } while (0)
 
 #define RAW_PMW_NOMASK(x...) do { \
-	printk(KERN_ERR "[PMW] "x); \
+	pr_info_ratelimited("[PMW] "x); \
 } while (0)
 
 #define IO(x...) do { \
 if (smd_rpcrouter_debug_mask & RPC_MSG) \
-	printk(KERN_ERR "[RPC] "x); \
+	pr_info_ratelimited("[RPC] "x); \
 } while (0)
 
 #define NTFY(x...) do { \
 if (smd_rpcrouter_debug_mask & NTFY_MSG) \
-	printk(KERN_ERR "[NOTIFY] "x); \
+	pr_info_ratelimited("[NOTIFY] "x); \
 } while (0)
 #else
 #define D(x...) do { } while (0)
@@ -211,6 +212,7 @@ struct rpcrouter_xprt_info {
 	uint32_t need_len;
 	struct work_struct read_data;
 	struct workqueue_struct *workqueue;
+	unsigned char r2r_buf[RPCROUTER_MSGSIZE_MAX];
 };
 
 static LIST_HEAD(xprt_info_list);
@@ -222,14 +224,10 @@ static struct rpcrouter_xprt_info *rpcrouter_get_xprt_info(uint32_t remote_pid)
 {
 	struct rpcrouter_xprt_info *xprt_info;
 
-	mutex_lock(&xprt_info_list_lock);
 	list_for_each_entry(xprt_info, &xprt_info_list, list) {
-		if (xprt_info->remote_pid == remote_pid) {
-			mutex_unlock(&xprt_info_list_lock);
+		if (xprt_info->remote_pid == remote_pid)
 			return xprt_info;
 		}
-	}
-	mutex_unlock(&xprt_info_list_lock);
 	return NULL;
 }
 
@@ -549,6 +547,9 @@ int msm_rpcrouter_destroy_local_endpoint(struct msm_rpc_endpoint *ept)
 	/* Endpoint with dst_pid = 0xffffffff corresponds to that of
 	** router port. So don't send a REMOVE CLIENT message while
 	** destroying it.*/
+	spin_lock_irqsave(&local_endpoints_lock, flags);
+	list_del(&ept->list);
+	spin_unlock_irqrestore(&local_endpoints_lock, flags);
 	if (ept->dst_pid != 0xffffffff) {
 		msg.cmd = RPCROUTER_CTRL_CMD_REMOVE_CLIENT;
 		msg.cli.pid = ept->pid;
@@ -580,9 +581,6 @@ int msm_rpcrouter_destroy_local_endpoint(struct msm_rpc_endpoint *ept)
 
 	wake_lock_destroy(&ept->read_q_wake_lock);
 	wake_lock_destroy(&ept->reply_q_wake_lock);
-	spin_lock_irqsave(&local_endpoints_lock, flags);
-	list_del(&ept->list);
-	spin_unlock_irqrestore(&local_endpoints_lock, flags);
 	kfree(ept);
 	return 0;
 }
@@ -612,16 +610,11 @@ static int rpcrouter_create_remote_endpoint(uint32_t pid, uint32_t cid)
 static struct msm_rpc_endpoint *rpcrouter_lookup_local_endpoint(uint32_t cid)
 {
 	struct msm_rpc_endpoint *ept;
-	unsigned long flags;
 
-	spin_lock_irqsave(&local_endpoints_lock, flags);
 	list_for_each_entry(ept, &local_endpoints, list) {
-		if (ept->cid == cid) {
-			spin_unlock_irqrestore(&local_endpoints_lock, flags);
+		if (ept->cid == cid)
 			return ept;
-		}
 	}
-	spin_unlock_irqrestore(&local_endpoints_lock, flags);
 	return NULL;
 }
 
@@ -689,8 +682,9 @@ static int process_control_msg(struct rpcrouter_xprt_info *xprt_info,
 	static int first = 1;
 
 	if (len != sizeof(*msg)) {
-		printk(KERN_ERR "rpcrouter: r2r msg size %d != %d\n",
-		       len, sizeof(*msg));
+//Commented_120112 to protect personal Information- Logchecker Errors	
+//		printk(KERN_ERR "rpcrouter: r2r msg size %d != %d\n",
+//		       len, sizeof(*msg));
 		return -EINVAL;
 	}
 
@@ -732,7 +726,8 @@ static int process_control_msg(struct rpcrouter_xprt_info *xprt_info,
 		break;
 
 	case RPCROUTER_CTRL_CMD_RESUME_TX:
-		RR("o RESUME_TX id=%d:%08x\n", msg->cli.pid, msg->cli.cid);
+//Commented_120112 to protect personal Information- Logchecker Errors	
+//		RR("o RESUME_TX id=%d:%08x\n", msg->cli.pid, msg->cli.cid);
 
 		r_ept = rpcrouter_lookup_remote_endpoint(msg->cli.pid,
 							 msg->cli.cid);
@@ -936,8 +931,6 @@ static char *type_to_str(int i)
 }
 #endif
 
-static uint32_t r2r_buf[RPCROUTER_MSGSIZE_MAX];
-
 static void do_read_data(struct work_struct *work)
 {
 	struct rr_header hdr;
@@ -957,16 +950,17 @@ static void do_read_data(struct work_struct *work)
 
 	if (rr_read(xprt_info, &hdr, sizeof(hdr)))
 		goto fail_io;
-
-	RR("- ver=%d type=%d src=%d:%08x crx=%d siz=%d dst=%d:%08x\n",
+		
+//Commented_120112 to protect personal Information- Logchecker Errors
+	/*RR("- ver=%d type=%d src=%d:%08x crx=%d siz=%d dst=%d:%08x\n",
 	   hdr.version, hdr.type, hdr.src_pid, hdr.src_cid,
-	   hdr.confirm_rx, hdr.size, hdr.dst_pid, hdr.dst_cid);
-	RAW_HDR("[r rr_h] "
-	    "ver=%i,type=%s,src_pid=%08x,src_cid=%08x,"
-	    "confirm_rx=%i,size=%3i,dst_pid=%08x,dst_cid=%08x\n",
-	    hdr.version, type_to_str(hdr.type), hdr.src_pid, hdr.src_cid,
-	    hdr.confirm_rx, hdr.size, hdr.dst_pid, hdr.dst_cid);
-
+	   hdr.confirm_rx, hdr.size, hdr.dst_pid, hdr.dst_cid);  Fixing Log Checker issues */
+//	RAW_HDR("[r rr_h] "
+//	    "ver=%i,type=%s,src_pid=%08x,src_cid=%08x,"
+//	    "confirm_rx=%i,size=%3i,dst_pid=%08x,dst_cid=%08x\n",
+//	    hdr.version, type_to_str(hdr.type), hdr.src_pid, hdr.src_cid,
+//	    hdr.confirm_rx, hdr.size, hdr.dst_pid, hdr.dst_cid);
+//
 	if (hdr.version != RPCROUTER_VERSION) {
 		DIAG("version %d != %d\n", hdr.version, RPCROUTER_VERSION);
 		goto fail_data;
@@ -980,9 +974,10 @@ static void do_read_data(struct work_struct *work)
 		if (xprt_info->remote_pid == -1)
 			xprt_info->remote_pid = hdr.src_pid;
 
-		if (rr_read(xprt_info, r2r_buf, hdr.size))
+		if (rr_read(xprt_info, xprt_info->r2r_buf, hdr.size))
 			goto fail_io;
-		process_control_msg(xprt_info, (void *) r2r_buf, hdr.size);
+		process_control_msg(xprt_info,
+				    (void *) xprt_info->r2r_buf, hdr.size);
 		goto done;
 	}
 
@@ -1038,8 +1033,10 @@ static void do_read_data(struct work_struct *work)
 	}
 #endif
 
+	spin_lock_irqsave(&local_endpoints_lock, flags);
 	ept = rpcrouter_lookup_local_endpoint(hdr.dst_cid);
 	if (!ept) {
+		spin_unlock_irqrestore(&local_endpoints_lock, flags);
 		DIAG("no local ept for cid %08x\n", hdr.dst_cid);
 		kfree(frag);
 		goto done;
@@ -1049,7 +1046,7 @@ static void do_read_data(struct work_struct *work)
 	 * and if so, append this fragment to that packet.
 	 */
 	mid = PACMARK_MID(pm);
-	spin_lock_irqsave(&ept->incomplete_lock, flags);
+	spin_lock(&ept->incomplete_lock);
 	list_for_each_entry(pkt, &ept->incomplete, list) {
 		if (pkt->mid == mid) {
 			pkt->last->next = frag;
@@ -1057,15 +1054,16 @@ static void do_read_data(struct work_struct *work)
 			pkt->length += frag->length;
 			if (PACMARK_LAST(pm)) {
 				list_del(&pkt->list);
-				spin_unlock_irqrestore(&ept->incomplete_lock,
-						       flags);
+				spin_unlock(&ept->incomplete_lock);
 				goto packet_complete;
 			}
-			spin_unlock_irqrestore(&ept->incomplete_lock, flags);
+			spin_unlock(&ept->incomplete_lock);
+			spin_unlock_irqrestore(&local_endpoints_lock, flags);
 			goto done;
 		}
 	}
-	spin_unlock_irqrestore(&ept->incomplete_lock, flags);
+	spin_unlock(&ept->incomplete_lock);
+	spin_unlock_irqrestore(&local_endpoints_lock, flags);
 	/* This mid is new -- create a packet for it, and put it on
 	 * the incomplete list if this fragment is not a last fragment,
 	 * otherwise put it on the read queue.
@@ -1076,18 +1074,32 @@ static void do_read_data(struct work_struct *work)
 	memcpy(&pkt->hdr, &hdr, sizeof(hdr));
 	pkt->mid = mid;
 	pkt->length = frag->length;
+
+	spin_lock_irqsave(&local_endpoints_lock, flags);
+	ept = rpcrouter_lookup_local_endpoint(hdr.dst_cid);
+	if (!ept) {
+		spin_unlock_irqrestore(&local_endpoints_lock, flags);
+		DIAG("no local ept for cid %08x\n", hdr.dst_cid);
+		kfree(frag);
+		kfree(pkt);
+		goto done;
+	}
 	if (!PACMARK_LAST(pm)) {
+		spin_lock(&ept->incomplete_lock);
 		list_add_tail(&pkt->list, &ept->incomplete);
+		spin_unlock(&ept->incomplete_lock);
+		spin_unlock_irqrestore(&local_endpoints_lock, flags);
 		goto done;
 	}
 
 packet_complete:
-	spin_lock_irqsave(&ept->read_q_lock, flags);
+	spin_lock(&ept->read_q_lock);
 	D("%s: take read lock on ept %p\n", __func__, ept);
 	wake_lock(&ept->read_q_wake_lock);
 	list_add_tail(&pkt->list, &ept->read_q);
 	wake_up(&ept->wait_q);
-	spin_unlock_irqrestore(&ept->read_q_lock, flags);
+	spin_unlock(&ept->read_q_lock);
+	spin_unlock_irqrestore(&local_endpoints_lock, flags);
 done:
 
 	if (hdr.confirm_rx) {
@@ -1096,8 +1108,8 @@ done:
 		msg.cmd = RPCROUTER_CTRL_CMD_RESUME_TX;
 		msg.cli.pid = hdr.dst_pid;
 		msg.cli.cid = hdr.dst_cid;
-
-		RR("x RESUME_TX id=%d:%08x\n", msg.cli.pid, msg.cli.cid);
+//Commented_120112 to protect personal Information- Logchecker Errors
+//		RR("x RESUME_TX id=%d:%08x\n", msg.cli.pid, msg.cli.cid);
 		rpcrouter_send_control_msg(xprt_info, &msg);
 
 #if defined(CONFIG_MSM_ONCRPCROUTER_DEBUG)
@@ -1263,14 +1275,15 @@ static int msm_rpc_write_pkt(
 	if (r_ept)
 		spin_unlock_irqrestore(&r_ept->quota_lock, flags);
 
+	mutex_lock(&xprt_info_list_lock);
 	xprt_info = rpcrouter_get_xprt_info(hdr->dst_pid);
-
-	if(!xprt_info) {
-		printk(KERN_ERR "!@#$ xprt_info is NULL!!!\n");
+	if (!xprt_info) {
+		mutex_unlock(&xprt_info_list_lock);
 		return -ENETRESET;
 	}
 
 	spin_lock_irqsave(&xprt_info->lock, flags);
+	mutex_unlock(&xprt_info_list_lock);
 	spin_lock(&ept->restart_lock);
 	if (ept->restart_state != RESTART_NORMAL) {
 		ept->restart_state &= ~RESTART_PEND_NTFY;
@@ -1285,7 +1298,14 @@ static int msm_rpc_write_pkt(
 		spin_unlock(&ept->restart_lock);
 		spin_unlock_irqrestore(&xprt_info->lock, flags);
 		msleep(250);
+		mutex_lock(&xprt_info_list_lock);
+		xprt_info = rpcrouter_get_xprt_info(hdr->dst_pid);
+		if (!xprt_info) {
+			mutex_unlock(&xprt_info_list_lock);
+			return -ENETRESET;
+		}
 		spin_lock_irqsave(&xprt_info->lock, flags);
+		mutex_unlock(&xprt_info_list_lock);
 		spin_lock(&ept->restart_lock);
 	}
 	if (ept->restart_state != RESTART_NORMAL) {
@@ -1490,9 +1510,10 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 		}
 		hdr.dst_pid = ept->dst_pid;
 		hdr.dst_cid = ept->dst_cid;
-		IO("CALL to %08x:%d @ %d:%08x (%d bytes)\n",
-		   be32_to_cpu(rq->prog), be32_to_cpu(rq->vers),
-		   ept->dst_pid, ept->dst_cid, count);
+//Commented_120112 to protect personal Information- Logchecker Errors		
+//		IO("CALL to %08x:%d @ %d:%08x (%d bytes)\n",
+//		   be32_to_cpu(rq->prog), be32_to_cpu(rq->vers),
+//		   ept->dst_pid, ept->dst_cid, count);
 	} else {
 		/* RPC REPLY */
 		reply = get_pend_reply(ept, rq->xid);
@@ -1503,8 +1524,9 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 		}
 		hdr.dst_pid = reply->pid;
 		hdr.dst_cid = reply->cid;
-		IO("REPLY to xid=%d @ %d:%08x (%d bytes)\n",
-		   be32_to_cpu(rq->xid), hdr.dst_pid, hdr.dst_cid, count);
+//Commented_120112 to protect personal Information- Logchecker Errors		
+//		IO("REPLY to xid=%d @ %d:%08x (%d bytes)\n",
+//		   be32_to_cpu(rq->xid), hdr.dst_pid, hdr.dst_cid, count);
 	}
 
 	r_ept = rpcrouter_lookup_remote_endpoint(hdr.dst_pid, hdr.dst_cid);
@@ -1524,8 +1546,9 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 	   first 8 bytes it uses on the modem side for addressing,
 	   the next 4 bytes are for the pacmark header. */
 	max_tx = RPCROUTER_MSGSIZE_MAX - 8 - sizeof(uint32_t);
-	IO("Writing %d bytes, max pkt size is %d\n",
-	   tx_cnt, max_tx);
+	
+	/*IO("Writing %d bytes, max pkt size is %d\n",
+	   tx_cnt, max_tx);   Fixing Log Checker issues  */
 	while (tx_cnt > 0) {
 		if (tx_cnt > max_tx) {
 			rc = msm_rpc_write_pkt(&hdr, ept, r_ept,
@@ -1535,8 +1558,9 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 				count = rc;
 				goto write_release_lock;
 			}
-			IO("Wrote %d bytes First %d, Last 0 mid %d\n",
-			   rc, first_pkt, mid);
+//Commented_120112 to protect personal Information- Logchecker Errors			
+//			IO("Wrote %d bytes First %d, Last 0 mid %d\n",
+//			   rc, first_pkt, mid);
 			tx_cnt -= max_tx;
 			tx_buf += max_tx;
 		} else {
@@ -1547,8 +1571,9 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 				count = rc;
 				goto write_release_lock;
 			}
-			IO("Wrote %d bytes First %d Last 1 mid %d\n",
-			   rc, first_pkt, mid);
+//Commented_120112 to protect personal Information- Logchecker Errors			
+//			IO("Wrote %d bytes First %d Last 1 mid %d\n",
+//			   rc, first_pkt, mid);
 			break;
 		}
 		first_pkt = 0;
@@ -1723,7 +1748,7 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 	unsigned long flags;
 	int rc;
 
-	IO("READ on ept %p\n", ept);
+//	IO("READ on ept %p\n", ept);//Commented_120112 to protect personal Information- Logchecker Errors
 	spin_lock_irqsave(&ept->restart_lock, flags);
 	if (ept->restart_state !=  RESTART_NORMAL) {
 		ept->restart_state &= ~RESTART_PEND_NTFY;
@@ -1809,8 +1834,8 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 	}
 
 	kfree(pkt);
-
-	IO("READ on ept %p (%d bytes)\n", ept, rc);
+//Commented_120112 to protect personal Information- Logchecker Errors
+//	IO("READ on ept %p (%d bytes)\n", ept, rc);
 
  read_release_lock:
 
@@ -2312,7 +2337,7 @@ static int __init rpcrouter_init(void)
 	int ret;
 
 	msm_rpc_connect_timeout_ms = 0;
-	smd_rpcrouter_debug_mask |= SMEM_LOG;
+	smd_rpcrouter_debug_mask |= (SMEM_LOG | R2R_MSG | RPC_MSG);
 	debugfs_init();
 
 	/* Initialize what we need to start processing */

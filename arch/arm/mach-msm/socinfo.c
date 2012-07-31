@@ -489,6 +489,8 @@ int __init socinfo_init(void)
 	if (socinfo->v1.id < ARRAY_SIZE(cpu_of_id))
 		cur_cpu = cpu_of_id[socinfo->v1.id];
 
+//  Protected the personal information : Google logchecker issue
+#ifndef     PRODUCT_SHIP
 	switch (socinfo->v1.format) {
 	case 1:
 		pr_info("%s: v%u, id=%u, ver=%u.%u\n",
@@ -537,6 +539,8 @@ int __init socinfo_init(void)
 		pr_err("%s: Unknown format found\n", __func__);
 		break;
 	}
+#endif
+//
 
 	return 0;
 }

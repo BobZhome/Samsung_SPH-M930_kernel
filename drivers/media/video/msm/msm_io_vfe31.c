@@ -209,7 +209,8 @@ void msm_io_memcpy(void __iomem *dest_addr, void __iomem *src_addr, u32 len)
 
 static void msm_camera_vreg_enable(struct platform_device *pdev)
 {
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	return; //don't use it
 #endif
 

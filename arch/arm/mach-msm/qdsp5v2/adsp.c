@@ -220,7 +220,7 @@ int msm_adsp_get(const char *name, struct msm_adsp_module **out,
 		goto done;
 	}
 
-	MM_INFO("module %s has been registered\n", module->name);
+	//MM_INFO("module %s has been registered\n", module->name);  Disabling logs because of CTS error
 
 done:
 	return rc;
@@ -431,8 +431,8 @@ int msm_adsp_write(struct msm_adsp_module *module, unsigned dsp_queue_addr,
 			udelay(50);
 	} while (rc == -EAGAIN && retries++ < 300);
 	if (retries > 20)
-		MM_INFO("%s command took %d attempts: rc %d\n",
-			module->name, retries, rc);
+		; /*MM_INFO("%s command took %d attempts: rc %d\n",
+			module->name, retries, rc);  Disabling logs because of CTS error */
 	return rc;
 }
 
@@ -586,8 +586,8 @@ static void adsp_rtos_mtoa_cb(void *context, uint32_t param,
 	module_id = pkt_ptr->module;
 	image     = pkt_ptr->image;
 
-	MM_INFO("rpc event=%d, proc_id=%d, module=%d, image=%d\n",
-		event, proc_id, module_id, image);
+	/*MM_INFO("rpc event=%d, proc_id=%d, module=%d, image=%d\n",
+		event, proc_id, module_id, image); Disabling logs because of CTS error*/
 
 	module = find_adsp_module_by_id(&adsp_info, module_id);
 	if (!module) {
@@ -598,29 +598,29 @@ static void adsp_rtos_mtoa_cb(void *context, uint32_t param,
 	mutex_lock(&module->lock);
 	switch (event) {
 	case RPC_ADSP_RTOS_MOD_READY:
-		MM_INFO("module %s: READY\n", module->name);
+		//MM_INFO("module %s: READY\n", module->name); Disabling logs because of CTS error
 		module->state = ADSP_STATE_ENABLED;
 		wake_up(&module->state_wait);
 		adsp_set_image(module->info, image);
 		break;
 	case RPC_ADSP_RTOS_MOD_DISABLE:
-		MM_INFO("module %s: DISABLED\n", module->name);
+		//MM_INFO("module %s: DISABLED\n", module->name); Disabling logs because of CTS error
 		module->state = ADSP_STATE_DISABLED;
 		wake_up(&module->state_wait);
 		break;
 	case RPC_ADSP_RTOS_SERVICE_RESET:
-		MM_INFO("module %s: SERVICE_RESET\n", module->name);
+		//MM_INFO("module %s: SERVICE_RESET\n", module->name);  Disabling logs because of CTS error
 		module->state = ADSP_STATE_DISABLED;
 		wake_up(&module->state_wait);
 		break;
 	case RPC_ADSP_RTOS_CMD_SUCCESS:
-		MM_INFO("module %s: CMD_SUCCESS\n", module->name);
+		//MM_INFO("module %s: CMD_SUCCESS\n", module->name); Disabling logs because of CTS error
 		break;
 	case RPC_ADSP_RTOS_CMD_FAIL:
-		MM_INFO("module %s: CMD_FAIL\n", module->name);
+		//MM_INFO("module %s: CMD_FAIL\n", module->name);   Disabling logs because of CTS error
 		break;
 	case RPC_ADSP_RTOS_DISABLE_FAIL:
-		MM_INFO("module %s: DISABLE_FAIL\n", module->name);
+		//MM_INFO("module %s: DISABLE_FAIL\n", module->name);  Disabling logs because of CTS error
 		break;
 	default:
 		MM_ERR("unknown event %d\n", event);
@@ -825,8 +825,8 @@ int msm_adsp_enable(struct msm_adsp_module *module)
 {
 	int rc = 0;
 
-	MM_INFO("enable '%s'state[%d] id[%d]\n",
-				module->name, module->state, module->id);
+	/*MM_INFO("enable '%s'state[%d] id[%d]\n",
+				module->name, module->state, module->id); Disabling logs because of CTS error*/
 
 	mutex_lock(&module->lock);
 	switch (module->state) {
@@ -911,7 +911,7 @@ int msm_adsp_disable(struct msm_adsp_module *module)
 		mutex_lock(&adsp_open_lock);
 		if (--adsp_open_count == 0) {
 			disable_irq(INT_ADSP);
-			MM_INFO("disable interrupt\n");
+			//MM_INFO("disable interrupt\n"); Disabling logs because of CTS error
 		}
 		mutex_unlock(&adsp_open_lock);
 		break;
@@ -1053,7 +1053,7 @@ static int __init adsp_init(void)
 	msm_adsp_driver.driver.name = msm_adsp_driver_name;
 	rc = platform_device_register(&msm_adsp_device);
 	rc = platform_driver_register(&msm_adsp_driver);
-	MM_INFO("%s -- %d\n", msm_adsp_driver_name, rc);
+	//MM_INFO("%s -- %d\n", msm_adsp_driver_name, rc); Disabling logs because of CTS error
 	return rc;
 }
 

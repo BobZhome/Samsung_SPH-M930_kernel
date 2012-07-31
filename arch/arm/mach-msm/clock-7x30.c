@@ -828,7 +828,7 @@ int soc_update_sys_vdd(enum sys_vdd_level level)
 	int rc, target_mv;
 	static const int mv[NUM_SYS_VDD_LEVELS] = {
 		[NONE...LOW] = 1000,
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 		[NOMINAL] = 1150,
 #else
 		[NOMINAL] = 1100,

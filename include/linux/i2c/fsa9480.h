@@ -182,7 +182,8 @@ typedef enum
 }FSA9480_INT2_TYPE;
 #endif
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 struct fsa_platform_data {
 	int (*vreg_en)(int);
 

@@ -399,8 +399,9 @@ int msm_chg_usb_i_is_available(uint32_t sample)
 	if (rc < 0) {
 		pr_err("%s: charger_i_available failed! rc = %d\n",
 			__func__, rc);
-	} else
-		pr_debug("msm_chg_usb_i_is_available(%u)\n", sample);
+	} 
+	//else
+    //	pr_debug("msm_chg_usb_i_is_available(%u)\n", sample);//Commented_120112 to protect personal Information- Logchecker Errors
 
 	return rc;
 }
@@ -603,7 +604,7 @@ void hsusb_chg_connected(enum chg_type chgtype)
 		return;
 	}
 
-	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
+//	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
 
 	msm_chg_usb_charger_connected(chgtype);
 }

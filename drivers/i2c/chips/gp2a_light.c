@@ -52,7 +52,8 @@
 #define ABS_WAKE                        (ABS_MISC)
 #define ABS_CONTROL_REPORT              (ABS_THROTTLE)
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 #define MSM_LIGHTSENSOR_ADC_READ
 #endif
 
@@ -792,7 +793,7 @@ static struct platform_driver lightsensor_driver = {
 	.remove     = lightsensor_remove,
 	.suspend    = lightsensor_suspend,
 	.resume     = lightsensor_resume,
-#if !defined (CONFIG_MACH_CHIEF) && !defined (CONFIG_MACH_VITAL2)
+#if !defined (CONFIG_MACH_CHIEF) && !defined (CONFIG_MACH_VITAL2) && !defined (CONFIG_MACH_ROOKIE2)
 	.shutdown = lightsensor_remove,
 #endif
 	.driver = {

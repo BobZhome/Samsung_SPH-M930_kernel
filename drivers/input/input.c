@@ -377,7 +377,8 @@ void input_event(struct input_dev *dev,
 #endif // CONFIG_KERNEL_DEBUG_SEC
 #endif
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
     extern int keyshort_test_status;
     if(type==EV_MSC || type==EV_KEY)
 	keyshort_test_status = value;
@@ -1705,8 +1706,13 @@ int input_register_device(struct input_dev *dev)
 		return error;
 
 	path = kobject_get_path(&dev->dev.kobj, GFP_KERNEL);
+
+//  Protected the personal information : Google Logchecker issue
+#ifndef     PRODUCT_SHIP
 	printk(KERN_INFO "input: %s as %s\n",
 		dev->name ? dev->name : "Unspecified device", path ? path : "N/A");
+#endif
+//
 	kfree(path);
 
 	error = mutex_lock_interruptible(&input_mutex);

@@ -233,7 +233,7 @@ static u32 get_card_status(struct mmc_card *card, struct request *req)
 	cmd.flags = MMC_RSP_SPI_R2 | MMC_RSP_R1 | MMC_CMD_AC;
 	err = mmc_wait_for_cmd(card->host, &cmd, 0);
 	if (err)
-		printk(KERN_DEBUG "%s: error %d sending status comand",
+		printk(KERN_ERR "%s: error %d sending status comand",
 		       req->rq_disk->disk_name, err);
 	return cmd.resp[0];
 }
@@ -256,7 +256,7 @@ mmc_blk_set_blksize(struct mmc_blk_data *md, struct mmc_card *card)
 	mmc_release_host(card->host);
 
 	if (err) {
-		printk(KERN_DEBUG "%s: unable to set block size to %d: %d\n",
+		printk(KERN_ERR "%s: unable to set block size to %d: %d\n",
 			md->disk->disk_name, cmd.arg, err);
 		return -EINVAL;
 	}
@@ -346,7 +346,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 			brq.data.flags |= MMC_DATA_WRITE;
 		}
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || defined(CONFIG_MACH_PREVAIL2)
 		if (mmc_card_sd(card) && !mmc_host_sd_present(card->host)) {
 			printk(KERN_ERR "%s: Bad Request. SDcard removed.\n",
 					req->rq_disk->disk_name);
@@ -427,7 +427,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 			if (brq.data.error == -ETIMEDOUT && brq.mrq.stop)
 				/* 'Stop' response contains card status */
 				status = brq.mrq.stop->resp[0];
-			printk(KERN_DEBUG "%s: error %d transferring data,"
+			printk(KERN_ERR "%s: error %d transferring data,"
 			       " sector %u, nr %u, card status %#x\n",
 			       req->rq_disk->disk_name, brq.data.error,
 			       (unsigned)blk_rq_pos(req),
@@ -435,7 +435,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		}
 
 		if (brq.stop.error) {
-			printk(KERN_DEBUG "%s: error %d sending stop command, "
+			printk(KERN_ERR "%s: error %d sending stop command, "
 			       "response %#x, card status %#x\n",
 			       req->rq_disk->disk_name, brq.stop.error,
 			       brq.stop.resp[0], status);
@@ -450,7 +450,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 				cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
 				err = mmc_wait_for_cmd(card->host, &cmd, 5);
 				if (err) {
-					printk(KERN_DEBUG "%s: error %d requesting status\n",
+					printk(KERN_ERR "%s: error %d requesting status\n",
 					       req->rq_disk->disk_name, err);
 					goto cmd_err;
 				}
@@ -498,7 +498,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 	return 1;
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2 || defined(CONFIG_MACH_PREVAIL2)
  err_sd_removed:
 	spin_lock_irq(&md->lock);
 

@@ -632,6 +632,7 @@ struct kgsl_platform_data kgsl_pdata = {
 	.grp2d1_bus_scale_table = &grp2d1_bus_scale_pdata,
 	.nap_allowed = true,
 #endif
+	.pwrrail_first = true,
 #ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
 	.pt_va_size = SZ_32M,
 	/* Maximum of 32 concurrent processes */
@@ -1399,6 +1400,36 @@ struct platform_device msm_device_smd = {
 	.id             = -1,
 };
 
+struct resource msm_dmov_resource_adm0[] = {
+	{
+		.start = INT_ADM0_AARM,
+		.end = (resource_size_t)MSM_DMOV_ADM0_BASE,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+struct resource msm_dmov_resource_adm1[] = {
+	{
+		.start = INT_ADM1_AARM,
+		.end = (resource_size_t)MSM_DMOV_ADM1_BASE,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm_device_dmov_adm0 = {
+	.name	= "msm_dmov",
+	.id	= 0,
+	.resource = msm_dmov_resource_adm0,
+	.num_resources = ARRAY_SIZE(msm_dmov_resource_adm0),
+};
+
+struct platform_device msm_device_dmov_adm1 = {
+	.name	= "msm_dmov",
+	.id	= 1,
+	.resource = msm_dmov_resource_adm1,
+	.num_resources = ARRAY_SIZE(msm_dmov_resource_adm1),
+};
+
 /* MSM Video core device */
 
 #define MSM_VIDC_BASE_PHYS 0x04400000
@@ -1583,10 +1614,10 @@ struct clk_lookup msm_clocks_8x60[] = {
 	CLK_8X60("sdc_pclk",		SDC3_P_CLK, "msm_sdcc.3", OFF),
 	CLK_8X60("sdc_pclk",		SDC4_P_CLK, "msm_sdcc.4", OFF),
 	CLK_8X60("sdc_pclk",		SDC5_P_CLK, "msm_sdcc.5", OFF),
-	CLK_8X60("adm_clk",		ADM0_CLK,		NULL, OFF),
-	CLK_8X60("adm_pclk",		ADM0_P_CLK,		NULL, OFF),
-	CLK_8X60("adm_clk",		ADM1_CLK,		NULL, OFF),
-	CLK_8X60("adm_pclk",		ADM1_P_CLK,		NULL, OFF),
+	CLK_8X60("adm_clk",		ADM0_CLK, "msm_dmov.0", OFF),
+	CLK_8X60("adm_pclk",		ADM0_P_CLK, "msm_dmov.0", OFF),
+	CLK_8X60("adm_clk",		ADM1_CLK, "msm_dmov.1", OFF),
+	CLK_8X60("adm_pclk",		ADM1_P_CLK, "msm_dmov.1", OFF),
 	CLK_8X60("modem_ahb1_pclk",	MODEM_AHB1_P_CLK,	NULL, OFF),
 	CLK_8X60("modem_ahb2_pclk",	MODEM_AHB2_P_CLK,	NULL, OFF),
 	CLK_8X60("pmic_arb_pclk",	PMIC_ARB0_P_CLK,	NULL, OFF),
@@ -1686,6 +1717,12 @@ struct clk_lookup msm_clocks_8x60[] = {
 					"dfab_clk",    "msm_sdcc.4", 0),
 	CLK_VOTER("dfab_sdc_clk",      DFAB_SDC5_CLK,
 					"dfab_clk",    "msm_sdcc.5", 0),
+	CLK_VOTER("ebi1_msmbus_clk",   EBI_MSMBUS_CLK,
+					"ebi1_clk",    NULL, 0),
+	CLK_VOTER("ebi1_adm_clk",     EBI_ADM0_CLK,
+					"ebi1_clk",    "msm_dmov.0", 0),
+	CLK_VOTER("ebi1_adm_clk",     EBI_ADM1_CLK,
+					"ebi1_clk",    "msm_dmov.1", 0),
 };
 
 unsigned msm_num_clocks_8x60 = ARRAY_SIZE(msm_clocks_8x60);

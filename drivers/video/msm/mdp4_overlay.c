@@ -45,13 +45,17 @@
 
 
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 #define FORCE_FREE_VIDEO_OVERLAY_PIPE
 #endif
 
 #if defined(FORCE_FREE_VIDEO_OVERLAY_PIPE)
 static int force_free_mdp_video_overlay_pipe;
 extern unsigned long get_platform_reset_count(void);
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)/* use the p_reset sysfs to force free up the video pipe when platform reset occurs. */
+extern unsigned get_platform_reset_cnt(void);
+#endif
 #endif
 
 struct mdp4_overlay_ctrl {
@@ -114,6 +118,18 @@ struct mdp4_overlay_ctrl {
 static struct mdp4_overlay_ctrl *ctrl = &mdp4_overlay_db;
 static uint32 perf_level;
 static uint32 mdp4_del_res_rel;
+/* static array with index 0 for unset status and 1 for set status */
+static bool overlay_status[MDP4_OVERLAY_TYPE_MAX];
+
+void mdp4_overlay_status_write(enum mdp4_overlay_status type, bool val)
+{
+	overlay_status[type] = val;
+}
+
+bool mdp4_overlay_status_read(enum mdp4_overlay_status type)
+{
+	return overlay_status[type];
+}
 
 int mdp4_overlay_mixer_play(int mixer_num)
 {
@@ -182,6 +198,45 @@ void mdp4_overlay_dmae_cfg(struct msm_fb_data_type *mfd, int atv)
 		MDP_OUTP(MDP_BASE + 0xb0078, 0xff0000);
 	}
 
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+}
+
+void unfill_black_screen(void)
+{
+	uint32 temp_src_format;
+
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+	/*
+	* VG2 Constant Color
+	*/
+	temp_src_format = inpdw(MDP_BASE + 0x30050);
+	MDP_OUTP(MDP_BASE + 0x30050, temp_src_format&(~BIT(22)));
+	/*
+	* MDP_OVERLAY_REG_FLUSH
+	*/
+	MDP_OUTP(MDP_BASE + 0x18000, BIT(3));
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+}
+
+void fill_black_screen(void)
+{
+	/*Black color*/
+	uint32 color = 0x00000000;
+	uint32 temp_src_format;
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+	/*
+	* VG2 Constant Color
+	*/
+	MDP_OUTP(MDP_BASE + 0x31008, color);
+	/*
+	* MDP_VG2_SRC_FORMAT
+	*/
+	temp_src_format = inpdw(MDP_BASE + 0x30050);
+	MDP_OUTP(MDP_BASE + 0x30050, temp_src_format | BIT(22));
+	/*
+	* MDP_OVERLAY_REG_FLUSH
+	*/
+	MDP_OUTP(MDP_BASE + 0x18000, BIT(3));
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 }
 
@@ -1180,6 +1235,8 @@ void mdp4_overlay_reg_flush(struct mdp4_overlay_pipe *pipe, int all)
 {
 	uint32 bits = 0;
 
+	wmb(); /* make sure registers updated */
+
 	if (pipe->mixer_num == MDP4_MIXER1)
 		bits |= 0x02;
 	else
@@ -1201,6 +1258,7 @@ void mdp4_overlay_reg_flush(struct mdp4_overlay_pipe *pipe, int all)
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	outpdw(MDP_BASE + 0x18000, bits);	/* MDP_OVERLAY_REG_FLUSH */
+	wmb();
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 }
 
@@ -1240,7 +1298,13 @@ struct mdp4_overlay_pipe *mdp4_overlay_pipe_alloc(
 	for (i = 0; i < MDP4_MAX_PIPE; i++) {
 		
 #if defined(FORCE_FREE_VIDEO_OVERLAY_PIPE)
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)/* use the p_reset sysfs to force free up the video pipe when platform reset occurs. */
+		platform_reset_count = get_platform_reset_cnt();
+		//pr_err("[!@#$] reset_cnt: %d, overlay_pipe: %d\n", platform_reset_count, force_free_mdp_video_overlay_pipe);
+#else
 		platform_reset_count = get_platform_reset_count();
+#endif
+
 		if(platform_reset_count && 
 				platform_reset_count != force_free_mdp_video_overlay_pipe && 
 				ptype == pipe->pipe_type && 
@@ -1963,6 +2027,12 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 
 	mdp4_stat.overlay_set[pipe->mixer_num]++;
 
+	if (ctrl->panel_mode & MDP4_PANEL_MDDI) {
+		if (mdp_hw_revision == MDP4_REVISION_V2_1 &&
+			pipe->mixer_num == MDP4_MIXER0)
+			mdp4_overlay_status_write(MDP4_OVERLAY_TYPE_SET, true);
+	}
+
 	mdp4_del_res_rel = 0;
 	mutex_unlock(&mfd->dma->ov_mutex);
 	mdp_set_core_clk(perf_level);
@@ -1989,6 +2059,7 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct mdp4_overlay_pipe *pipe;
+	uint32 flags;
 
 	if (mfd == NULL)
 		return -ENODEV;
@@ -2033,14 +2104,28 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 		}
 #else
 		if (ctrl->panel_mode & MDP4_PANEL_MDDI) {
+			if (mdp_hw_revision == MDP4_REVISION_V2_1)
+				mdp4_overlay_status_write(
+					MDP4_OVERLAY_TYPE_UNSET, true);
 			if (mfd->panel_power_on)
 				mdp4_mddi_overlay_restore();
 		}
 #endif
-		else	/* LCDC, MIPI_VIDEO panel */
-			mdp4_overlay_reg_flush(pipe, 0);
-	} else	/* mixer1, DTV, ATV */
-		mdp4_overlay_reg_flush(pipe, 0);
+		else {	/* LCDC, MIPI_VIDEO panel */
+			flags = pipe->flags;
+			pipe->flags &= ~MDP_OV_PLAY_NOWAIT;
+			mdp4_overlay_vsync_push(mfd, pipe);
+			pipe->flags = flags;
+		}
+	}
+#ifdef CONFIG_FB_MSM_DTV
+	else {	/* mixer1, DTV, ATV */
+		flags = pipe->flags;
+		pipe->flags &= ~MDP_OV_PLAY_NOWAIT;
+		mdp4_overlay_dtv_vsync_push(mfd, pipe);
+		pipe->flags = flags;
+	}
+#endif
 
 	mdp4_stat.overlay_unset[pipe->mixer_num]++;
 
@@ -2054,7 +2139,8 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 
 #ifdef CONFIG_MSM_BUS_SCALING
 	if (pipe->mixer_num == MDP4_MIXER0)
-		mdp_bus_scale_update_request(2);
+		if (mfd->panel_power_on)
+			mdp_bus_scale_update_request(2);
 #endif
 	return 0;
 }
@@ -2182,7 +2268,7 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 		/* enternal interface */
 		if (ctrl->panel_mode & MDP4_PANEL_DTV)
 #ifdef CONFIG_FB_MSM_DTV
-			mdp4_overlay_dtv_vsync_push(mfd, pipe);
+			mdp4_overlay_dtv_ov_done_push(mfd, pipe);
 #else
 			mdp4_overlay_reg_flush(pipe, 1);
 #endif

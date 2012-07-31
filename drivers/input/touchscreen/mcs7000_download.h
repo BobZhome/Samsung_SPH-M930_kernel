@@ -9,6 +9,62 @@
 #ifndef __MELFAS_FIRMWARE_DOWNLOAD_H__
 #define __MELFAS_FIRMWARE_DOWNLOAD_H__
 
+#define FW_FROM_FILE
+//merge
+#ifdef FW_FROM_FILE
+#include <asm/io.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
+#include <linux/uaccess.h>
+
+#if defined(CONFIG_MACH_ROOKIE2)
+#define MELFAS_FW1 "/mnt/sdcard/master.hex"
+#else
+#define MELFAS_FW1 "/mnt/sdcard/Vital2_tsp_fw.bin"
+//#define MELFAS_FW2 "/mnt/sdcard/Slave.bin"
+#endif
+#endif
+
+#define BINARY_FIRMWARE_VERSION	0x22
+// ISC download mode
+//#define MELFAS_ISC_2CHIP_DOWNLOAD_ENABLE            0       // 0 : 1Chip Download, 1: 2Chip Download
+#define MELFAS_CORE_FIRWMARE_UPDATE_ENABLE          1       // 0 : disable, 1: enable
+#define MELFAS_PRIVATE_CONFIGURATION_UPDATE_ENABLE   0       // 0 : disable, 1: enable
+#define MELFAS_PUBLIC_CONFIGURATION_UPDATE_ENABLE    0       // 0 : disable, 1: enable
+#define MELFAS_ISP_DOWNLOAD 0								// 0: ISC mode   1:ISP mode   
+
+//----------------------------------------------------
+//   ISC Mode
+//----------------------------------------------------
+
+#define MELFAS_CRC_CHECK_ENABLE                     1
+
+#define ISC_MODE_SLAVE_ADDRESS                  0x48
+
+#define ISC_READ_DOWNLOAD_POSITION              0          //0 : USE ISC_PRIVATE_CONFIG_FLASH_START 1: READ FROM RMI MAP(0x61,0x62)
+#define ISC_PRIVATE_CONFIG_FLASH_START          25
+#define ISC_PUBLIC_CONFIG_FLASH_START               28
+
+//address for ISC MODE
+#define ISC_DOWNLOAD_MODE_ENTER                 0x5F
+#define ISC_DOWNLOAD_MODE                       0x60
+#define ISC_PRIVATE_CONFIGURATION_START_ADDR     0x61
+#define ISC_PUBLIC_CONFIGURATION_START_ADDR      0x62
+
+#define ISC_READ_SLAVE_CRC_OK                   0x63        // return value from slave
+#define ISC_CORE_FIRMWARE_VERSION_ADDR          0x64
+
+// mode
+#define ISC_CORE_FIRMWARE_DL_MODE               0x01
+#define ISC_PRIVATE_CONFIGURATION_DL_MODE        0x02
+#define ISC_PUBLIC_CONFIGURATION_DL_MODE         0x03
+#define ISC_SLAVE_DOWNLOAD_START                0x04
+#define MCSDL_FIRMWARE_UPDATE_MODE_ENTER_FAILED	0x03
+#define MCSDL_FIRMWARE_UPDATE_FAILED            0x04
+#define MCSDL_LEAVE_FIRMWARE_UPDATE_MODE_FAILED 0x05
+#define MCSTS_FIRMWARE_VER_REG_MASTER  	0x31 //F/W Version MASTER
+#define MCSTS_FIRMWARE_VER_REG_SLAVE  	0x32 //F/W Version SLAVE
+//merge
 //=====================================================================
 //
 //   MELFAS Firmware download pharameters
@@ -175,8 +231,13 @@ void mcsdl_vdd_off(void);
 #define MCSTS_POINT_Y_LOW_REG   0x13 //Point(Y Low Byte)
 #define MCSTS_STRENGTH_REG      0x14 //Strength
 #define MCSTS_CABLE_DET_REG     0x1F //USB, TA cable detect  
+#if defined (CONFIG_MACH_ROOKIE2)
+#define MCSTS_MODULE_VER_REG    0x1C //H/W Module Revision
+#define MCSTS_FIRMWARE_VER_REG  0x1D //F/W Version
+#else
 #define MCSTS_MODULE_VER_REG    0x30 //H/W Module Revision
 #define MCSTS_FIRMWARE_VER_REG  0x31 //F/W Version
+#endif
 
 
 
@@ -211,7 +272,14 @@ void mcsdl_vdd_off(void);
 
 int mcsdl_download_binary_data(void);			// with binary type .c   file.
 //int mcsdl_download_binary_file(void);			// with binary type .bin file.
+//merge
+int mms100_ISC_download_binary_data(void);
+int mms100_ISC_download_binary_file(void);
 
+//---------------------------------
+//	Delay functions
+//---------------------------------
+void mcsdl_delay(UINT32 nCount);
 #if MELFAS_ENABLE_DELAY_TEST                    // For initial porting test.
 void mcsdl_delay_test(INT32 nCount);
 #endif

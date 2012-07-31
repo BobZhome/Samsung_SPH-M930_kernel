@@ -26,7 +26,8 @@
 #include <mach/vreg.h>
 #include <mach/gpio.h>
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 #define CONFIG_PMIC8058_LPG
 #endif
 
@@ -115,7 +116,7 @@ static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value)
 	u8 level;
 	unsigned long flags;
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	{
 		if (led->id == PMIC8058_ID_LED_KB_LIGHT) {
 			 if (system_rev >= 5) {
@@ -169,7 +170,7 @@ static void kp_bl_set(struct pmic8058_led_data *led, enum led_brightness value)
 
 static enum led_brightness kp_bl_get(struct pmic8058_led_data *led)
 {
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	if(vreg_get_refcnt(NULL, "wlan"))
 		return LED_FULL;
 	else
@@ -191,8 +192,11 @@ static void led_lc_set(struct pmic8058_led_data *led, enum led_brightness value)
 	int rc, offset;
 	u8 level, tmp;
 
+//  Protecting the personal information : Google Logchecker issue
+    #ifndef PRODUCT_SHIP
 	pr_info("[%s] id:%d value:%d\n", __func__, led->id, value);
-	
+    #endif
+    	
 #if 1 //sleep.led.debug
 	if(is_sleep_debug_enabled()) {
 		pr_info("[%s] sleep debug is enabled!\n", __func__);
