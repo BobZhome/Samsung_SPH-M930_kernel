@@ -1,9 +1,0 @@
-#
-# WIBRO_CMC LAN device drivers configuration
-#
-
-
-
-menuconfig WIBRO_CMC
-		bool "samsung wibro cmc support"
-		default n
