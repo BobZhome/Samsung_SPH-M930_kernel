@@ -47,6 +47,12 @@ struct android_usb_product {
 	 */
 	int num_functions;
 	char **functions;
+
+#ifdef CONFIG_USB_SAMSUNG_DRIVER
+	unsigned char device_class;
+	unsigned char device_subclass;
+	unsigned char device_protocol;
+#endif
 };
 
 struct android_usb_platform_data {

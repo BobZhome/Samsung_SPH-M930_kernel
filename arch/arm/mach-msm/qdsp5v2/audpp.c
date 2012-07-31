@@ -294,11 +294,11 @@ static void audpp_dsp_event(void *data, unsigned id, size_t len,
 		break;
 	case AUDPP_MSG_CFG_MSG:
 		if (msg[0] == AUDPP_MSG_ENA_ENA) {
-			MM_INFO("ENABLE\n");
+			//MM_INFO("ENABLE\n");   Disabling logs because of CTS error
 			audpp->enabled = 1;
 			audpp_broadcast(audpp, id, msg);
 		} else if (msg[0] == AUDPP_MSG_ENA_DIS) {
-			MM_INFO("DISABLE\n");
+			//MM_INFO("DISABLE\n"); Disabling logs because of CTS error
 			audpp->enabled = 0;
 			wake_up(&audpp->event_wait);
 			audpp_broadcast(audpp, id, msg);
@@ -418,11 +418,13 @@ void audpp_disable(int id, void *private)
 		audpp_dsp_config(0);
 		rc = wait_event_interruptible(audpp->event_wait,
 				(audpp->enabled == 0));
+#if 0 //Disabling logs because of CTS error		
 		if (audpp->enabled == 0)
 			MM_INFO("Received CFG_MSG_DISABLE from ADSP\n");
 		else
 			MM_ERR("Didn't receive CFG_MSG DISABLE \
 					message from ADSP\n");
+#endif					
 		msm_adsp_disable(audpp->mod);
 		msm_adsp_put(audpp->mod);
 		audpp->mod = NULL;

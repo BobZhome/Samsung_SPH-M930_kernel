@@ -2369,6 +2369,9 @@ void show_free_areas(void)
 		}
 	}
 
+//  Protected the personal Information : Google LogChecker issue
+#ifndef     PRODUCT_SHIP
+
 	printk("active_anon:%lu inactive_anon:%lu isolated_anon:%lu\n"
 		" active_file:%lu inactive_file:%lu isolated_file:%lu\n"
 		" unevictable:%lu"
@@ -2393,10 +2396,16 @@ void show_free_areas(void)
 		global_page_state(NR_PAGETABLE),
 		global_page_state(NR_BOUNCE));
 
+#endif
+//
 	for_each_populated_zone(zone) {
 		int i;
 
 		show_node(zone);
+
+//  Protected the personal Information : Google LogChecker issue
+#ifndef     PRODUCT_SHIP
+
 		printk("%s"
 			" free:%lukB"
 			" min:%lukB"
@@ -2454,6 +2463,10 @@ void show_free_areas(void)
 			zone->pages_scanned,
 			(zone->all_unreclaimable ? "yes" : "no")
 			);
+
+#endif
+//
+
 		printk("lowmem_reserve[]:");
 		for (i = 0; i < MAX_NR_ZONES; i++)
 			printk(" %lu", zone->lowmem_reserve[i]);

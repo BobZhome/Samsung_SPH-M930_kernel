@@ -107,6 +107,8 @@
 #endif
 #include <linux/i2c/kr3dh.h>
 #include <linux/i2c/fsa9480.h>
+#include <mach/parameters.h>
+#include <linux/i2c/melfas_ts.h>
 
 #ifdef CONFIG_SERIAL_MSM_RX_WAKEUP
 struct msm_serial_platform_data {
@@ -2983,31 +2985,24 @@ static struct platform_device mass_storage_device = {
 #endif
 #ifdef CONFIG_USB_ANDROID
 static char *usb_functions_default[] = {
-	"diag",
-	"acm",
-//	"nmea",
-//	"rmnet",
 	"usb_mass_storage",
 };
 
-static char *usb_functions_default_adb[] = {
-	"diag",
+static char *usb_functions_adb[] = {
 	"acm",
-//	"nmea",
-//	"rmnet",
 	"usb_mass_storage",
 	"adb",
 };
 
-static char *fusion_usb_functions_default[] = {
-	"diag",
-	"nmea",
+static char *usb_functions_diag[] = {
+	"acm",
 	"usb_mass_storage",
+	"diag",
 };
 
-static char *fusion_usb_functions_default_adb[] = {
+static char *usb_functions_adb_diag[] = {
 	"diag",
-	"nmea",
+	"acm",
 	"usb_mass_storage",
 	"adb",
 };
@@ -3016,21 +3011,6 @@ static char *usb_functions_rndis[] = {
 	"rndis",
 };
 
-static char *usb_functions_rndis_adb[] = {
-	"rndis",
-	"adb",
-};
-
-static char *usb_functions_rndis_diag[] = {
-	"rndis",
-	"diag",
-};
-
-static char *usb_functions_rndis_adb_diag[] = {
-	"rndis",
-	"diag",
-	"adb",
-};
 static char *usb_functions_mtp_only[] = {
 	"usb_mtp_gadget",
 };
@@ -3059,32 +3039,67 @@ static char *usb_functions_all[] = {
 };
 
 static struct android_usb_product usb_products[] = {
-/*
 	{
-		.product_id	= 0x9026,
+		.product_id	= 0xF000,
 		.num_functions	= ARRAY_SIZE(usb_functions_default),
 		.functions	= usb_functions_default,
+		#ifdef CONFIG_USB_SAMSUNG_DRIVER
+		.device_class = USB_CLASS_MASS_STORAGE,
+		.device_subclass = 0x06,
+		.device_protocol = 0x50,
+		#endif
 	},
-*/
+#if defined(CONFIG_MACH_VITAL2_BST)
+	{
+		.product_id	= 0x681C,
+		.num_functions	= ARRAY_SIZE(usb_functions_adb),
+		.functions	= usb_functions_adb,
+		#ifdef CONFIG_USB_SAMSUNG_DRIVER
+		.device_class = USB_CLASS_COMM,
+		.device_subclass = 0,
+		.device_protocol = 0,
+		#endif
+	},
 	{
 		.product_id	= 0x689E,
-		.num_functions	= ARRAY_SIZE(usb_functions_default),
-		.functions	= usb_functions_default,
+		.num_functions	= ARRAY_SIZE(usb_functions_diag),
+		.functions	= usb_functions_diag,
+		#ifdef CONFIG_USB_SAMSUNG_DRIVER
+		.device_class = USB_CLASS_COMM,
+		.device_subclass = 0,
+		.device_protocol = 0,
+		#endif
 	},
+#endif
 	{
 		.product_id	= 0x689E,
-		.num_functions	= ARRAY_SIZE(usb_functions_default_adb),
-		.functions	= usb_functions_default_adb,
+		.num_functions	= ARRAY_SIZE(usb_functions_adb_diag),
+		.functions	= usb_functions_adb_diag,
+		#ifdef CONFIG_USB_SAMSUNG_DRIVER
+		.device_class = USB_CLASS_COMM,
+		.device_subclass = 0,
+		.device_protocol = 0,
+		#endif
 	},
 	{
 		.product_id	= 0x5A0F,
 		.num_functions	= ARRAY_SIZE(usb_functions_mtp_only),
 		.functions	= usb_functions_mtp_only,
+		#ifdef CONFIG_USB_SAMSUNG_DRIVER
+		.device_class = USB_CLASS_COMM,
+		.device_subclass = 0,
+		.device_protocol = 0,
+		#endif
 	},
 	{
 		.product_id	= 0x6881,
 		.num_functions	= ARRAY_SIZE(usb_functions_rndis),
 		.functions	= usb_functions_rndis,
+		#ifdef CONFIG_USB_SAMSUNG_DRIVER
+		.device_class = USB_CLASS_COMM,
+		.device_subclass = 0,
+		.device_protocol = 0,
+		#endif
 	},
 /*	
 	{
@@ -3126,7 +3141,7 @@ static struct platform_device rndis_device = {
 
 static struct android_usb_platform_data android_usb_pdata = {
 	.vendor_id	= 0x04E8, // Samsung Vendor ID
-	.product_id	= 0x689E,
+	.product_id	= 0xF000,
 	.version	= 0x0100,
 	.product_name	= "Samsung Android USB Device",
 	.manufacturer_name = "SAMSUNG Electronics Co., Ltd.",
@@ -3182,11 +3197,29 @@ static struct i2c_board_info qt602240_touch_boardinfo[] = {
 
 
 #ifdef CONFIG_TOUCHSCREEN_MELFAS
+static struct tsp_callbacks * charger_callbacks;
 
+static void  vital2_inform_charger_connection(int mode)
+{
+	if (charger_callbacks && charger_callbacks->inform_charger)
+		charger_callbacks->inform_charger(charger_callbacks, mode);
+};
+
+static void register_tsp_callbacks(struct tsp_callbacks *cb)
+{
+	charger_callbacks = cb;
+}
+
+static struct melfas_platform_data melfas_data = {
+	.register_cb = register_tsp_callbacks,
+};
 
 static struct platform_device touchscreen_device_melfas = {
 	.name = "melfas-ts",
 	.id = -1,
+	.dev        = {
+		.platform_data  = &melfas_data,
+	},	
 };
 
 static struct i2c_board_info melfas_touch_boardinfo[] = {
@@ -3200,6 +3233,9 @@ static struct i2c_board_info melfas_touch_boardinfo[] = {
 static struct platform_device touchscreen_device_melfas_05 = {
 	.name = "melfas-ts",
 	.id = -1,
+	.dev        = {
+		.platform_data  = &melfas_data,
+	},	
 };
 
 static struct i2c_board_info melfas_touch_boardinfo_05[] = {
@@ -4929,11 +4965,16 @@ static struct resource bluesleep_resources_rev05[] = {
          bluesleep_stop();
          gpio_direction_output(GPIO_BT_RESET, GPIO_WLAN_LEVEL_LOW);/* BT_VREG_CTL */
 
+#ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+         gpio_direction_output(GPIO_BT_WLAN_REG_ON, GPIO_WLAN_LEVEL_LOW);/* GPIO_BT_WLAN_REG_ON */
+         mdelay(150);
+#else
          if( gpio_get_value(GPIO_WLAN_RESET) == GPIO_WLAN_LEVEL_LOW ) //SEC_BLUETOOTH : pjh_2010.06.30
          {
-             gpio_direction_output(GPIO_BT_WLAN_REG_ON, GPIO_WLAN_LEVEL_LOW);/* BT_RESET */
+             gpio_direction_output(GPIO_BT_WLAN_REG_ON, GPIO_WLAN_LEVEL_LOW);/* GPIO_BT_WLAN_REG_ON */
              mdelay(150);
          }
+#endif         
          gpio_direction_output(GPIO_BT_WAKE, GPIO_WLAN_LEVEL_LOW);/* BT_VREG_CTL */
 
          if(system_rev >= 5)
@@ -4973,6 +5014,7 @@ static struct msm_psy_batt_pdata msm_psy_batt_data = {
 	.voltage_max_design	= 4200,	//4300,
 	.avail_chg_sources   	= AC_CHG | USB_CHG ,
 	.batt_technology        = POWER_SUPPLY_TECHNOLOGY_LION,
+	.inform_charger_connection = vital2_inform_charger_connection,
 };
 
 static struct platform_device samsung_batt_device = {
@@ -6173,17 +6215,16 @@ static struct msm_gpio sdc1_cfg_data[] = {
 
 static struct msm_gpio sdc2_cfg_data[] = { /* INAND */
 	{GPIO_CFG(64, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA), "sdc2_clk"},
-	{GPIO_CFG(65, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_cmd"},
-	{GPIO_CFG(66, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_3"},
-	{GPIO_CFG(67, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_2"},
-	{GPIO_CFG(68, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_1"},
-	{GPIO_CFG(69, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_0"},
-
+	{GPIO_CFG(65, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_cmd"},
+	{GPIO_CFG(66, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_dat_3"},
+	{GPIO_CFG(67, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_dat_2"},
+	{GPIO_CFG(68, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_dat_1"},
+	{GPIO_CFG(69, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_dat_0"},
 #ifdef CONFIG_MMC_MSM_SDC2_8_BIT_SUPPORT
-	{GPIO_CFG(115, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_4"},
-	{GPIO_CFG(114, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_5"},
-	{GPIO_CFG(113, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_6"},
-	{GPIO_CFG(112, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA), "sdc2_dat_7"},
+	{GPIO_CFG(115, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_dat_4"},
+	{GPIO_CFG(114, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_dat_5"},
+	{GPIO_CFG(113, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_dat_6"},
+	{GPIO_CFG(112, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_12MA), "sdc2_dat_7"},
 #endif
 };
 
@@ -6758,8 +6799,6 @@ void uart_set_exclusive(void)
 }
 
 
-#include <mach/parameters.h>
-
 int emmc_boot_param_read(struct BOOT_PARAM *param_data)
 {
 	pr_info("%s this function is depricated\n", __func__);
@@ -6830,12 +6869,14 @@ static int init_param_proc_entry(void)
 extern struct class *sec_class;
 struct device *rory_dev;
 
+/* rory : samsung multi download solution */
+/* for sysfs control (/sys/class/sec/rory/rory_control) */
 static ssize_t rory_control_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct BOOT_PARAM param;
 	
 	param_read(PARAM_TYPE_BOOT, &param, sizeof(param));
-	printk(KERN_ERR "%s: param.multi_download_slot_num: %d\n", __func__, param.multi_download_slot_num);
+	printk(KERN_INFO "%s: param.multi_download_slot_num: %d\n", __func__, param.multi_download_slot_num);
 
 	return sprintf(buf, "%d\n", param.multi_download_slot_num);
 }
@@ -6847,7 +6888,7 @@ static ssize_t rory_control_store(struct device *dev, struct device_attribute *a
 	int ret;
 	
 	sscanf(buf, "%i", &slot_num);
-	printk(KERN_ERR "%s: store multi_download_slot_num: %d\n", __func__, slot_num);
+	printk(KERN_INFO "%s: store multi_download_slot_num: %d\n", __func__, slot_num);
 
 	ret = param_read(PARAM_TYPE_BOOT, &param, sizeof(param));
 	if(ret) {
@@ -6861,8 +6902,36 @@ static ssize_t rory_control_store(struct device *dev, struct device_attribute *a
 }
 static DEVICE_ATTR(rory_control, S_IRUGO | S_IWUGO, rory_control_show, rory_control_store);
 
-/* rory : samsung multi download solution */
-/* for sysfs control (/sys/class/sec/rory/rory_control) */
+#if 1 /* use the p_reset sysfs to force free up the video pipe when platform reset occurs. */
+struct device *preset_dev;
+
+/* platform reset */
+/* for sysfs control (/sys/class/sec/preset/p_reset) */
+static unsigned int p_reset_count = 0;
+unsigned int get_platform_reset_cnt(void)
+{
+	return p_reset_count;
+}
+
+static ssize_t platform_reset_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	p_reset_count++;
+
+	if(strncmp(buf, "sm", 2) == 0) {
+		printk(KERN_INFO "%s: platform reset on servicemanager. [count:%d]\n", __func__, p_reset_count);
+	}
+	else if(strncmp(buf, "zy", 2) == 0) {
+		printk(KERN_INFO "%s: platform reset on zygote. [count:%d]\n", __func__, p_reset_count);
+	}
+	else {
+		printk(KERN_INFO "%s: platform reset![count:%d]\n", __func__, p_reset_count);
+	}
+
+	return size;
+}
+static DEVICE_ATTR(p_reset, S_IRUGO | S_IWUGO, NULL, platform_reset_store);
+#endif
+
 static void rory_init(void)
 {
 	rory_dev = device_create(sec_class, NULL, 0, NULL, "rory");
@@ -6873,7 +6942,17 @@ static void rory_init(void)
 	if (device_create_file(rory_dev, &dev_attr_rory_control) < 0) {
 		pr_err("Failed to create device file(%s)!\n", dev_attr_rory_control.attr.name);
 	}
-	printk(KERN_ERR "%s: initalized for rory!\n", __func__);
+	printk(KERN_INFO "%s: initalized for rory!\n", __func__);
+
+#if 1 /* use the p_reset sysfs to force free up the video pipe when platform reset occurs. */
+	preset_dev = device_create(sec_class, NULL, 0, NULL, "preset");
+	if (IS_ERR(preset_dev)) {
+		pr_err("Failed to create device(p_reset)!\n");
+	}
+	if (device_create_file(preset_dev, &dev_attr_p_reset) < 0) {
+		pr_err("Failed to create device file(%s)!\n", dev_attr_p_reset.attr.name);
+	}
+#endif
 }
 #endif /*RORY_CONTROL*/
 

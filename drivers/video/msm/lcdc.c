@@ -62,7 +62,7 @@ static struct platform_driver lcdc_driver = {
 };
 
 static struct lcdc_platform_data *lcdc_pdata;
-#if !defined (CONFIG_MACH_CHIEF)
+#if !defined (CONFIG_MACH_CHIEF) || !defined(CONFIG_MACH_PREVAIL2)
 static int lcd_clk_enable = FALSE;
 extern void mdp4_overlay_block_on(void);
 #endif
@@ -90,7 +90,7 @@ static int lcdc_off(struct platform_device *pdev)
 #else
 	mdp_bus_scale_update_request(0);
 #endif
-#if !defined (CONFIG_MACH_CHIEF)
+#if !defined (CONFIG_MACH_CHIEF) || !defined(CONFIG_MACH_PREVAIL2)
         lcd_clk_enable = FALSE;
 #endif
 
@@ -106,13 +106,14 @@ static int lcdc_on(struct platform_device *pdev)
 #ifndef CONFIG_MSM_BUS_SCALING
 	unsigned long pm_qos_rate;
 #endif
-#if !defined (CONFIG_MACH_CHIEF)
+#if !defined (CONFIG_MACH_CHIEF) || !defined(CONFIG_MACH_PREVAIL2)
         if(lcd_clk_enable) return;
 #endif
 
 	mfd = platform_get_drvdata(pdev);
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 //chief.sony.lcd lcd power up sequence changed
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)//chief.sony.lcd lcd power up sequence changed
 	// vdd, vcc power on before dotclk (sony & smd)
 	if (lcdc_pdata && lcdc_pdata->lcdc_power_save)
 		lcdc_pdata->lcdc_power_save(1);
@@ -155,7 +156,7 @@ static int lcdc_on(struct platform_device *pdev)
 	clk_enable(pixel_mdp_clk);
 	clk_enable(pixel_lcdc_clk);
 
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	printk("%s %15s:%4d\n",__func__,current->comm,task_pid_nr(current));
 	
 	if(strcmp(current->comm,"suspend") && strcmp(current->comm,"swapper")){
@@ -166,23 +167,25 @@ static int lcdc_on(struct platform_device *pdev)
 		
 	pr_info("@LCDINIT@:DOTCLK clock enabled\n");
 
-#if !defined (CONFIG_MACH_CHIEF)
+#if !defined (CONFIG_MACH_CHIEF) || !defined(CONFIG_MACH_PREVAIL2)
         lcd_clk_enable = TRUE;
 #endif
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 //chief.sony.lcd lcd power up sequence changed
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)//chief.sony.lcd lcd power up sequence changed
 	//wait for clock to stabilize
 	msleep(20);
 #endif
 
-#if !defined CONFIG_MACH_CHIEF && !defined CONFIG_MACH_VITAL2 //chief.sony.lcd lcd power up sequence changed
+#if !defined CONFIG_MACH_CHIEF && !defined CONFIG_MACH_VITAL2 && ! defined (CONFIG_MACH_ROOKIE2) && \
+	!defined(CONFIG_MACH_PREVAIL2) //chief.sony.lcd lcd power up sequence changed
 	if (lcdc_pdata && lcdc_pdata->lcdc_power_save)
 		lcdc_pdata->lcdc_power_save(1);
 #endif
 	if (lcdc_pdata && lcdc_pdata->lcdc_gpio_config)
 		ret = lcdc_pdata->lcdc_gpio_config(1);
 
-#ifdef CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 	mdp4_overlay_block_on();
 #endif
 	// start disp on sequence

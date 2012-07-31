@@ -949,15 +949,16 @@ static void do_read_data(struct work_struct *work)
 
 	if (rr_read(xprt_info, &hdr, sizeof(hdr)))
 		goto fail_io;
+//Commented_120112 to protect personal Information- Logchecker Errors
 
-	RR("- ver=%d type=%d src=%d:%08x crx=%d siz=%d dst=%d:%08x\n",
-	   hdr.version, hdr.type, hdr.src_pid, hdr.src_cid,
-	   hdr.confirm_rx, hdr.size, hdr.dst_pid, hdr.dst_cid);
-	RAW_HDR("[r rr_h] "
-	    "ver=%i,type=%s,src_pid=%08x,src_cid=%08x,"
-	    "confirm_rx=%i,size=%3i,dst_pid=%08x,dst_cid=%08x\n",
-	    hdr.version, type_to_str(hdr.type), hdr.src_pid, hdr.src_cid,
-	    hdr.confirm_rx, hdr.size, hdr.dst_pid, hdr.dst_cid);
+//	RR("- ver=%d type=%d src=%d:%08x crx=%d siz=%d dst=%d:%08x\n",
+//	   hdr.version, hdr.type, hdr.src_pid, hdr.src_cid,
+//	   hdr.confirm_rx, hdr.size, hdr.dst_pid, hdr.dst_cid);
+//	RAW_HDR("[r rr_h] "
+//	    "ver=%i,type=%s,src_pid=%08x,src_cid=%08x,"
+//	    "confirm_rx=%i,size=%3i,dst_pid=%08x,dst_cid=%08x\n",
+//	    hdr.version, type_to_str(hdr.type), hdr.src_pid, hdr.src_cid,
+//	    hdr.confirm_rx, hdr.size, hdr.dst_pid, hdr.dst_cid);
 
 	if (hdr.version != RPCROUTER_VERSION) {
 		DIAG("version %d != %d\n", hdr.version, RPCROUTER_VERSION);
@@ -1086,8 +1087,8 @@ done:
 		msg.cmd = RPCROUTER_CTRL_CMD_RESUME_TX;
 		msg.cli.pid = hdr.dst_pid;
 		msg.cli.cid = hdr.dst_cid;
-
-		RR("x RESUME_TX id=%d:%08x\n", msg.cli.pid, msg.cli.cid);
+//Commented_120112 to protect personal Information- Logchecker Errors
+//		RR("x RESUME_TX id=%d:%08x\n", msg.cli.pid, msg.cli.cid);
 		rpcrouter_send_control_msg(xprt_info, &msg);
 
 #if defined(CONFIG_MSM_ONCRPCROUTER_DEBUG)
@@ -1506,8 +1507,9 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 				count = rc;
 				goto write_release_lock;
 			}
-			IO("Wrote %d bytes First %d, Last 0 mid %d\n",
-			   rc, first_pkt, mid);
+			//Commented_120112 to protect personal Information- Logchecker Errors
+//			IO("Wrote %d bytes First %d, Last 0 mid %d\n",
+//			   rc, first_pkt, mid);
 			tx_cnt -= max_tx;
 			tx_buf += max_tx;
 		} else {
@@ -1518,8 +1520,9 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 				count = rc;
 				goto write_release_lock;
 			}
-			IO("Wrote %d bytes First %d Last 1 mid %d\n",
-			   rc, first_pkt, mid);
+			//Commented_120112 to protect personal Information- Logchecker Errors
+//			IO("Wrote %d bytes First %d Last 1 mid %d\n",
+//			   rc, first_pkt, mid);
 			break;
 		}
 		first_pkt = 0;
@@ -1683,8 +1686,8 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 	DEFINE_WAIT(__wait);
 	unsigned long flags;
 	int rc;
-
-	IO("READ on ept %p\n", ept);
+    //Commented_120112 to protect personal Information- Logchecker Errors
+//	IO("READ on ept %p\n", ept);
 	spin_lock_irqsave(&ept->restart_lock, flags);
 	if (ept->restart_state !=  RESTART_NORMAL) {
 		ept->restart_state &= ~RESTART_PEND_NTFY;

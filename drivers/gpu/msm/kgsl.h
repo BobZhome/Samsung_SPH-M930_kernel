@@ -146,13 +146,15 @@ enum kgsl_status {
 #endif
 
 void kgsl_destroy_mem_entry(struct kgsl_mem_entry *entry);
-uint8_t *kgsl_gpuaddr_to_vaddr(const struct kgsl_memdesc *memdesc,
-	unsigned int gpuaddr, unsigned int *size);
 struct kgsl_mem_entry *kgsl_sharedmem_find_region(
 	struct kgsl_process_private *private, unsigned int gpuaddr,
 	size_t size);
-uint8_t *kgsl_sharedmem_convertaddr(struct kgsl_device *device,
-	unsigned int pt_base, unsigned int gpuaddr, unsigned int *size);
+const struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
+											    unsigned int pt_base,
+											    unsigned int gpuaddr,
+											    unsigned int size);
+uint8_t *adreno_convertaddr(struct kgsl_device *device,
+							   unsigned int pt_base, unsigned int gpuaddr, unsigned int size);
 int kgsl_idle(struct kgsl_device *device, unsigned int timeout);
 int kgsl_setstate(struct kgsl_device *device, uint32_t flags);
 
@@ -212,15 +214,26 @@ static inline void kgsl_drm_exit(void)
 #endif
 
 static inline int kgsl_gpuaddr_in_memdesc(const struct kgsl_memdesc *memdesc,
-				unsigned int gpuaddr)
+				unsigned int gpuaddr, unsigned int size)
 {
-	if (gpuaddr >= memdesc->gpuaddr && (gpuaddr + sizeof(unsigned int)) <=
-		(memdesc->gpuaddr + memdesc->size)) {
+	if (gpuaddr >= memdesc->gpuaddr &&
+	      ((gpuaddr + size) <= (memdesc->gpuaddr + memdesc->size))) {
 		return 1;
 	}
 	return 0;
 }
 
+static inline uint8_t *kgsl_gpuaddr_to_vaddr(const struct kgsl_memdesc *memdesc,
+										      unsigned int gpuaddr)
+{
+	if (memdesc->hostptr == NULL || memdesc->gpuaddr == 0 ||
+	     (gpuaddr < memdesc->gpuaddr ||
+	      gpuaddr >= memdesc->gpuaddr + memdesc->size))	      
+	     return NULL;
+
+	return memdesc->hostptr + (gpuaddr - memdesc->gpuaddr);
+	
+}
 static inline struct kgsl_device *kgsl_device_from_dev(struct device *dev)
 {
 	int i;

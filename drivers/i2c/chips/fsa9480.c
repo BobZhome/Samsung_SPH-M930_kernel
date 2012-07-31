@@ -24,7 +24,8 @@
 #include <linux/uaccess.h>
 #include <linux/i2c/fsa9480.h>
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 #include <linux/switch.h>
 #include <mach/parameters.h>
 extern struct device *switch_dev;
@@ -88,7 +89,8 @@ int fsa9480_i2c_read(unsigned char u_addr, unsigned char *pu_data);
 
 static unsigned int fsa_i2c_reset_mode=0;
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 //20101125_inchul
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2)  || \ 
+	defined(CONFIG_MACH_PREVAIL2) //20101125_inchul
 static int g_dock;
 static int g_default_ESN_status = 1; //20101129_inchul
 static int curr_usb_path = 0;
@@ -484,7 +486,8 @@ void fsa9480_disconnect_charger(void)	// vbus disconnected
 }
 EXPORT_SYMBOL(fsa9480_disconnect_charger);
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 //20101125_inchul
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2) //20101125_inchul
 /* USB SWITCH CONTROL */
 /* 0: MSM , 1 : MDM , 2 : CYAS */
 #define SWITCH_MSM		0
@@ -874,7 +877,8 @@ static void fsa9480_process_device(u8 dev1, u8 dev2, u8 attach)
 				break;
 
 			case CRA_USB:
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
                                      // reset askon connect usb mode
                                      if (android_usb_get_current_mode() & USB_MODE_ASKON)
                                           android_usb_switch(USB_MODE_ASKON);
@@ -1198,6 +1202,7 @@ void fsa9480_read_interrupt_register(void)
 	u8 valid_5v = 0, control_reg = 0;
 	int ret = 0;
 	int retrycnt = 2;
+	int i = 0, intr1_count = 0, intr2_count = 0;
 
 	while(retrycnt--) {
 		ret = fsa9480_i2c_read(REGISTER_INTERRUPT1, &intr1);  //0x03
@@ -1213,6 +1218,29 @@ void fsa9480_read_interrupt_register(void)
 
 		ret |= fsa9480_i2c_read(0x1D, &valid_5v);	//hidden
 
+/*FSA9480 Issue*/
+//////////////////////////////////////////////////////////////////////////////
+		for( i  = 0 ; i < 8 ; i++ )
+		{
+			if( intr1 & (0x01 << i))	intr1_count++;
+			if( interrupt2 & (0x01 << i))	intr2_count++;
+		}
+
+		if(intr1_count > 1)
+		{
+			printk("[FSA9480] intr1 register is wrong!!! After 30m seconds read!!\n");
+			msleep(30);
+			ret |= fsa9480_i2c_read(REGISTER_INTERRUPT1, &intr1);  //0x03
+		}
+
+		if(intr2_count > 1)
+		{
+			printk("[FSA9480] intr2 register is wrong!!! After 30m seconds read!!\n");
+			msleep(30);
+			ret |= fsa9480_i2c_read(REGISTER_INTERRUPT2, &interrupt2);  //0x04
+		}
+//////////////////////////////////////////////////////////////////////////////
+
 		printk("[FSA9480] dev1=0x%x, dev2=0x%x, intr1=0x%x, intr2=0x%x\n ",dev1,dev2,intr1,interrupt2);
 		printk("[FSA9480]  carkit_int1=0x%x, carkit_int2=0x%x, valid_5v=0x%x\n",carkit_int1,carkit_int2, valid_5v);
 
@@ -1224,7 +1252,8 @@ void fsa9480_read_interrupt_register(void)
 		fsa9480_reset_device();
 	}
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	if(dev1 & CRA_USB_CHARGER)
 	{
 		printk("[FSA9480] dev1 = CRA_USB_CHARGER, Not used. re-check!!!\n");
@@ -1283,7 +1312,8 @@ void fsa9480_read_interrupt_register(void)
 		}
 	}
 #endif
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	fsa9480_process_device(fsa9480_device1, fsa9480_device2, intr1);
 #else
 	if (fsa9480_device1)
@@ -1372,7 +1402,7 @@ void fsa9480_read_interrupt_register(void)
 	  }
 #endif
 
-#if defined CONFIG_MACH_VITAL2  
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2)  || defined(CONFIG_MACH_PREVAIL2)
 	 if (fsa9480_device2)
 	 {
 		 switch (fsa9480_device2)
@@ -1439,7 +1469,8 @@ static irqreturn_t fsa9480_interrupt_handler(int irq, void *data)
 static int fsa9480_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct fsa9480_data *mt;
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	struct samsung_parameter *param_data;
 	int i;
 #endif
@@ -1456,7 +1487,8 @@ static int fsa9480_probe(struct i2c_client *client, const struct i2c_device_id *
 		goto exit_alloc_data_failed;
 	}
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
      mt->pdata = client->dev.platform_data;
      if(mt->pdata && mt->pdata->vreg_en)
 		mt->pdata->vreg_en(1);
@@ -1477,7 +1509,8 @@ static int fsa9480_probe(struct i2c_client *client, const struct i2c_device_id *
 		printk("[FSA9480] fsa9480_interrupt_handler can't register the handler! and passing....\n");
 	}
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 	if ( !(param_data = kzalloc(sizeof(struct samsung_parameter),GFP_KERNEL))) {
 		printk("######### can not alloc memory for param_data ! ##################\n");
 		kfree(param_data);

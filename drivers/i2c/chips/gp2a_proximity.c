@@ -56,7 +56,7 @@
 #define GPIO_PS_VOUT	((system_rev>=5)?PM8058_GPIO_PM_TO_SYS(PM8058_GPIO(30)):PM8058_GPIO_PM_TO_SYS(PM8058_GPIO(14)))
 #endif
 
-#if defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 #define IRQ_GP2A_INT	PM8058_GPIO_IRQ(PMIC8058_IRQ_BASE, (PM8058_GPIO(30)))
 #define GPIO_PS_VOUT	PM8058_GPIO_PM_TO_SYS(PM8058_GPIO(30))
 #endif
@@ -389,7 +389,8 @@ static char get_ps_vout_value(void)
   char value = 0;
   unsigned char int_val;
 
-#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2
+#if defined CONFIG_MACH_CHIEF || defined CONFIG_MACH_VITAL2 || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 #ifdef USE_MODE_B
   int_val = REGS_PROX;
   opt_i2c_read((u8)(int_val), &value, 1);
@@ -918,7 +919,7 @@ void gp2a_opt_early_suspend(struct early_suspend *h)
 void gp2a_opt_late_resume(struct early_suspend *h)
 {
 	struct gp2a_data *gp2a = container_of(h, struct gp2a_data, early_suspend);
-	gprintk(KERN_INFO "gp2a_opt_late_resume\n");
+	//gprintk(KERN_INFO "gp2a_opt_late_resume\n");   Fixing Log Checker issues
 	if(!gp2a->pdev)
 		gprintk(KERN_INFO "gp2a_opt_late_resume is blocked\n");
 	else

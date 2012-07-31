@@ -392,7 +392,8 @@ int msm_chg_usb_charger_connected(uint32_t device)
 	if (rc < 0) {
 		pr_err("%s: charger_connected failed! rc = %d (rpc failed)\n",
 			__func__, rc);
-	} else
+	}
+	else
 		pr_debug("msm_chg_usb_charger_connected (rpc success)\n");
 
 	return rc;
@@ -418,8 +419,9 @@ int msm_chg_usb_i_is_available(uint32_t sample)
 	if (rc < 0) {
 		pr_err("%s: charger_i_available failed! rc = %d (rpc failed)\n",
 			__func__, rc);
-	} else
-		pr_info("msm_chg_usb_i_is_available(%u) (rpc success)\n", sample);
+	} 
+	//else
+//		pr_info("msm_chg_usb_i_is_available(%u) (rpc success)\n", sample);//Commented_120112 to protect personal Information- Logchecker Errors
 
 	return rc;
 }
@@ -442,8 +444,9 @@ int msm_chg_usb_i_is_not_available(void)
 	if (rc < 0) {
 		pr_err("%s: charger_i_not_available failed! rc ="
 			"%d (rpc failed)\n", __func__, rc);
-	} else
-		pr_debug("msm_chg_usb_i_is_not_available (rpc success)\n");
+	}
+	// else
+//		pr_debug("msm_chg_usb_i_is_not_available (rpc success)\n");//Commented_120112 to protect personal Information- Logchecker Errors
 
 	return rc;
 }
@@ -515,8 +518,9 @@ int msm_chg_usb_i_is_available_ext(uint32_t sample)
 	if (rc < 0) {
 		pr_err("%s: charger_i_available failed! rc = %d (rpc failed)\n",
 			__func__, rc);
-	} else
-		pr_info("msm_chg_usb_i_is_available(%u) (rpc success)\n", sample);
+	} 
+	//else
+//		pr_info("msm_chg_usb_i_is_available(%u) (rpc success)\n", sample);//Commented_120112 to protect personal Information- Logchecker Errors
 
 	return rc;
 }
@@ -537,8 +541,9 @@ int msm_chg_usb_i_is_not_available_ext(void)
 	if (rc < 0) {
 		pr_err("%s: charger_i_not_available failed! rc ="
 			"%d (rpc failed)\n", __func__, rc);
-	} else
-		pr_debug("msm_chg_usb_i_is_not_available (rpc success)\n");
+	}
+	// else
+//		pr_debug("msm_chg_usb_i_is_not_available (rpc success)\n");//Commented_120112 to protect personal Information- Logchecker Errors
 
 	return rc;
 }
@@ -747,8 +752,8 @@ void hsusb_chg_connected(enum chg_type chgtype)
 		msm_chg_usb_charger_disconnected();
 		return;
 	}
-
-	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
+//Commented_120112 to protect personal Information- Logchecker Errors
+//	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
 
 	msm_chg_usb_charger_connected(chgtype);
 }
@@ -774,8 +779,8 @@ void hsusb_chg_connected_ext(enum chg_type chgtype)
 		msm_chg_usb_charger_disconnected_ext();
 		return;
 	}
-
-	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
+//Commented_120112 to protect personal Information- Logchecker Errors
+//	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
 
 	msm_chg_usb_charger_connected_ext(chgtype);
 }

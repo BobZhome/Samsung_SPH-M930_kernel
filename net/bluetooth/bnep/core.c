@@ -717,7 +717,11 @@ static int __init bnep_init(void)
 	strcat(flt, "multicast");
 #endif
 
+//  Protected the personal information : Google logchecker issue
+#ifndef     PRODUCT_SHIP
 	BT_INFO("BNEP (Ethernet Emulation) ver %s", VERSION);
+#endif
+//
 	if (flt[0])
 		BT_INFO("BNEP filters: %s", flt);
 

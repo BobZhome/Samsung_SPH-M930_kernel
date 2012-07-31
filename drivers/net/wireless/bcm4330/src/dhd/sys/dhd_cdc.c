@@ -576,7 +576,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	uint32 glom = 0;
 	uint bcn_timeout = 12;
 	int arpoe = 1;
-	int arp_ol = 0xf;
+	int arp_ol = 0xb; //0xf;
 	int scan_assoc_time = 40;
 	int scan_unassoc_time = 80;
 	int assoc_retry = 3;
@@ -593,7 +593,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 		return BCME_NOTUP;
 	}
 	/* Print fw version info */
+#ifndef PRODUCT_SHIP
 	DHD_ERROR(("Firmware version = %s\n", buf));
+#endif
 
 	/* Get the device MAC address */
 	strcpy(iovbuf, "cur_etheraddr");
@@ -727,6 +729,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
 
 #if defined(USE_KEEP_ALIVE)
+#if defined(SOFTAP)
+	if (!ap_fw_loaded) {
+#endif
 	DHD_ERROR(("%s: KEEP Alive time is 45s \n", __FUNCTION__));
 	ret = dhd_enable_keepalive(dhd, 45000); /* 45 sec */
 	if (ret) {
@@ -734,6 +739,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 		/* For MFG mode */
 		ret = 0;
 	}
+#if defined(SOFTAP)
+	}
+#endif
 #endif
 
 #ifdef USE_WIFI_DIRECT

@@ -329,8 +329,12 @@ static int rmt_storage_event_open_cb(struct rmt_storage_event *event_args,
 		return cid;
 	}
 	__set_bit(cid, &rmc->cids);
-	pr_info("open partition %s handle=%d\n", event_args->path, cid);
 
+//  Protecting the personal information : Google Logchecker issue
+    #ifndef PRODUCT_SHIP
+	pr_info("open partition %s handle=%d\n", event_args->path, cid);
+    #endif
+    
 #ifdef CONFIG_MSM_RMT_STORAGE_CLIENT_STATS
 	stats = &client_stats[cid - 1];
 	memcpy(stats->path, event_args->path, len);

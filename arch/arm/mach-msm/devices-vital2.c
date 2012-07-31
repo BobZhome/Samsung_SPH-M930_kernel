@@ -608,8 +608,8 @@ static struct resource resources_sdc4[] = {
 		.flags	= IORESOURCE_IRQ,
 	},
 	{
-		.start	= 8,
-		.end	= 8,
+		.start	= 10,             //Different DMA Channel is used for SD card(10) and eMMC0(8)
+		.end	= 10,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -826,7 +826,7 @@ static struct resource tsif_resources[] = {
 	},
 	[2] = {
 		.flags = IORESOURCE_DMA,
-		.start = DMOV_TSIF_CHAN,
+		.start = DMOV_TSIF_CHAN,            //Note this channel is used by SD card now.Do not use this channel for any other operation.(resources_sdc4)
 		.end   = DMOV_TSIF_CRCI,
 	},
 };

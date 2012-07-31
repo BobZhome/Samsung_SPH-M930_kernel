@@ -1441,9 +1441,11 @@ int wl_iw_get_associnfo(struct net_device *dev,
 		bcopy(buf,extra,req_ies_len);
 		WL_TRACE(("Found ReqIEs length : %d\n", req_ies_len));
 		for (i = 1, passoc_ie = extra; i <= req_ies_len; i++) {
+#ifndef PRODUCT_SHIP
 			WL_TRACE(("%02x ", *passoc_ie++));
 			if (!(i%16))
 				WL_TRACE(("\n"));
+#endif
         	}
 		WL_TRACE(("\n"));          
       	}
@@ -2151,8 +2153,10 @@ iwpriv_get_assoc_list(struct net_device *dev,
 	for (i = 0; i < 8; i++) {
 		struct ether_addr * id = &sta_maclist->ea[i];
 
+#ifndef PRODUCT_SHIP
 		WL_SOFTAP(("dhd_drv>> sta_mac[%d] :", i));
 		dhd_print_buf((unsigned char *)&sta_maclist->ea[i], 6, 0);
+#endif
 
 		/* print all 8 macs into one string to be returned to the userspace  */
 		p_mac_str += snprintf(p_mac_str, MAX_WX_STRING,
@@ -2212,9 +2216,10 @@ static int iwpriv_get_assoc_list(struct net_device *dev,
         for (i = 0; i < 10; i++) {
                 struct ether_addr * id = &sta_maclist->ea[i];
 
+#ifndef PRODUCT_SHIP
                 WL_SOFTAP(("dhd_drv>> sta_mac[%d] :", i));
                 dhd_print_buf((unsigned char *)&sta_maclist->ea[i], 6, 0);
-
+#endif
 
                 p_mac_str += snprintf(p_mac_str, MAX_WX_STRING,
                         "Mac[%d]=%02X:%02X:%02X:%02X:%02X:%02X\n", i,
@@ -3012,9 +3017,11 @@ wl_iw_set_wap(
 	}
 
 	if (g_ssid.SSID_len) {
+#ifndef PRODUCT_SHIP
 		WL_TRACE(("%s: join SSID=%s BSSID="MACSTR" ch=%d\n", __FUNCTION__,
 			g_ssid.SSID, MAC2STR((u8 *)awrq->sa_data),
 			g_wl_iw_params.target_channel));
+#endif
 	}
 #endif
 	/* Clean up cached SSID */
@@ -3030,8 +3037,11 @@ wl_iw_get_wap(
 	char *extra
 )
 {
+//  Protecting the personal information : Google Logchecker issue
+    #ifndef PRODUCT_SHIP
 	WL_TRACE(("%s: SIOCGIWAP\n", dev->name));
-
+    #endif
+    
 	awrq->sa_family = ARPHRD_ETHER;
 	memset(awrq->sa_data, 0, ETHER_ADDR_LEN);
 
@@ -4950,8 +4960,10 @@ wl_iw_set_essid(
 	}
 	g_call_join_disassoc = G_WLAN_CALL_JOIN_DISASSOC;
 	if (g_ssid.SSID_len) {
+#ifndef PRODUCT_SHIP
 		WL_ERROR(("%s: join SSID=%s ch=%d\n", __FUNCTION__,
 			g_ssid.SSID,  g_wl_iw_params.target_channel));
+#endif
 	}
 	kfree(join_params);
 	return 0;
@@ -5635,8 +5647,11 @@ wl_iw_set_encodeext(
 	int error;
 	struct iw_encode_ext *iwe;
 
+//  Protecting the personal information : Google Logchecker issue
+    #ifndef PRODUCT_SHIP
 	WL_TRACE(("%s: SIOCSIWENCODEEXT\n", dev->name));
-
+    #endif
+    
 	RETURN_IF_EXTRA_NULL(extra);
 
 	memset(&key, 0, sizeof(key));
@@ -6368,8 +6383,11 @@ wl_iw_combined_scan_set(struct net_device *dev, wlc_ssid_t* ssids_local, int nss
 	int i;
 	iscan_info_t *iscan = g_iscan;
 
+//  Protecting the personal information : Google Logchecker issue
+    #ifndef PRODUCT_SHIP
 	WL_TRACE(("%s nssid=%d nchan=%d\n", __FUNCTION__, nssid, nchan));
-
+    #endif
+    
 	if ((!dev) && (!g_iscan) && (!iscan->iscan_ex_params_p)) {
 		WL_ERROR(("%s error exit\n", __FUNCTION__));
 		err = -1;
@@ -6872,31 +6890,37 @@ get_softap_auto_channel(struct net_device *dev, struct ap_profile *ap)
 	ASSERT(iolen);
 	res |= dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen);
 #endif
-	auto_channel_retry:
 			request.count = htod32(0);
 			ret = dev_wlc_ioctl(dev, WLC_START_CHANNEL_SEL, &request, sizeof(request));
 			if (ret < 0) {
-				WL_ERROR(("can't start auto channel scan\n"));
+			WL_ERROR(("can't start auto channel scan, error code = %d\n", ret));
 				goto fail;
 			}
 
 	get_channel_retry:
-			bcm_mdelay(500);
+		bcm_mdelay(350);
 
-			ret = dev_wlc_ioctl(dev, WLC_GET_CHANNEL_SEL, &chosen, sizeof(chosen));
-			if (ret < 0 || dtoh32(chosen) == 0) {
-				if (retry++ < 3)
+		ret = dev_wlc_ioctl(dev, WLC_GET_CHANNEL_SEL, &chosen, sizeof(chosen));
+		if (ret < 0 || dtoh32(chosen) == 0) {
+			if (retry++ < 15) {
 					goto get_channel_retry;
-				else {
+			} else {
+				if (ret < 0) {
 					WL_ERROR(("can't get auto channel sel, err = %d, "
-					          "chosen = %d\n", ret, chosen));
+							  "chosen = 0x%04X\n", ret, (uint16)chosen));
 					goto fail;
+				} else { /* no error, just timed out */
+					ap->channel = (uint16)last_auto_channel;
+					WL_ERROR(("auto channel sel timed out. we get channel %d\n", ap->channel));
 				}
 			}
-			if ((chosen == 1) && (!rescan++))
-				goto auto_channel_retry;
-			WL_SOFTAP(("Set auto channel = %d\n", chosen));
-			ap->channel = chosen;
+		}
+
+		if (chosen) {
+			ap->channel = (uint16)chosen & 0x00FF;
+			WL_SOFTAP(("Set auto channel = %d\n", ap->channel));
+		}
+
 			if ((res = dev_wlc_ioctl(dev, WLC_DOWN, &updown, sizeof(updown))) < 0) {
 				WL_ERROR(("%s fail to set up err =%d\n", __FUNCTION__, res));
 				goto fail;
@@ -6954,7 +6978,9 @@ set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 	WL_SOFTAP(("	channel = %d\n", ap->channel));
 	WL_SOFTAP(("	max scb = %d\n", ap->max_scb));
 #ifdef USE_HIDDEN_SSID
+#ifndef PRODUCT_SHIP
 	WL_SOFTAP(("	hidden = %d\n", ap->hidden_ssid));
+#endif
 #endif
 
 #ifdef USE_NA_HOTSPOT
@@ -7034,12 +7060,13 @@ set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 #endif /* AP_ONLY */
 
 		/*  WMM and ARP offloading disable  */
-      dev_wlc_intvar_set(dev, "wme", 0);
-      dev_wlc_intvar_set(dev, "arpoe", 0);
+          dev_wlc_intvar_set(dev, "wme", 0);
+          dev_wlc_intvar_set(dev, "arpoe", 0);
+	  dev_wlc_intvar_set(dev, "vlan_mode", 0);
 
 		updown = 1;
 		if ((res = dev_wlc_ioctl(dev, WLC_UP, &updown, sizeof(updown))) < 0) {
-			WL_ERROR(("%s fail to set apsta \n", __FUNCTION__));
+			WL_ERROR(("%s fail to set WLC_UP \n", __FUNCTION__));
 			goto fail;
 		}
 
@@ -7061,7 +7088,7 @@ set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 
 	/* ----  AP channel autoselect --- */
 	if ((ap->channel == 0) && (get_softap_auto_channel(dev, ap) < 0)) {
-		ap->channel = 1;
+		ap->channel = 6;
 		WL_ERROR(("%s auto channel failed, pick up channel=%d\n",
 			__FUNCTION__, ap->channel));
 	}
@@ -7124,7 +7151,9 @@ set_ap_cfg(struct net_device *dev, struct ap_profile *ap)
 		int iolen;
         
 		iolen = wl_bssiovar_mkbuf("closednet", 1, &my_ap.hidden_ssid, sizeof(uint32), buf, sizeof(buf), &res);
+#ifndef PRODUCT_SHIP
         	WL_SOFTAP(("hidden ap is enabled ? : %d\n",my_ap.hidden_ssid));
+#endif
 		ASSERT(iolen);
 		if ((res = dev_wlc_ioctl(dev, WLC_SET_VAR, buf, iolen)) != 0) {
 			WL_ERROR(("ERROR:%d in:%s, Hidden SSID setting failure\n", res, __FUNCTION__));
@@ -7452,9 +7481,9 @@ get_parameter_from_string(
 			param_str_end = *str_ptr-1;  /* pointer is set after the delim  */
 			parm_str_len = param_str_end - param_str_begin;
 		}
-
+#ifndef PRODUCT_SHIP
 		WL_TRACE((" 'token:%s', len:%d, ", token, parm_str_len));
-
+#endif
 		if (parm_str_len > param_max_len) {
 			WL_ERROR((" WARNING: extracted param len:%d is > MAX:%d\n",
 				parm_str_len, param_max_len));
@@ -7484,7 +7513,9 @@ get_parameter_from_string(
 				/* ASI hex string to buffer  */
 				param_max_len = param_max_len >> 1;  /* num of bytes */
 				hstr_2_buf(param_str_begin, buf, param_max_len);
+#ifndef PRODUCT_SHIP
 				dhd_print_buf(buf, param_max_len, 0);
+#endif
 			}
 			break;
 			default:
@@ -9277,8 +9308,15 @@ wl_iw_event(struct net_device *dev, wl_event_msg_t *e, void* data)
 #endif
 
 	default:
+	
+    	//  Protecting the personal information : Google Logchecker issue
+        #ifndef PRODUCT_SHIP
+        
 		/* Cannot translate event */
 		WL_TRACE(("Unknown Event %d: ignoring\n", event_type));
+        
+        #endif
+        
 		break;
 	}
 #ifndef SANDGATE2G

@@ -582,9 +582,7 @@ kgsl_sharedmem_find_region(struct kgsl_process_private *private,
 	BUG_ON(private == NULL);
 
 	list_for_each_entry(entry, &private->mem_list, list) {
-		if (gpuaddr >= entry->memdesc.gpuaddr &&
-		    ((gpuaddr + size) <=
-			(entry->memdesc.gpuaddr + entry->memdesc.size))) {
+		if (kgsl_gpuaddr_in_memdesc(&entry->memdesc, gpuaddr, size)) {
 			result = entry;
 			break;
 		}
@@ -593,49 +591,27 @@ kgsl_sharedmem_find_region(struct kgsl_process_private *private,
 	return result;
 }
 
-uint8_t *kgsl_gpuaddr_to_vaddr(const struct kgsl_memdesc *memdesc,
-	unsigned int gpuaddr, unsigned int *size)
+
+const struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
+	                                                                           unsigned int pt_base,
+	                                                                           unsigned int gpuaddr,
+	                                                                           unsigned int size)
+	                                                                           
 {
-	uint8_t *ptr = NULL;
-
-	if ((memdesc->priv & KGSL_MEMFLAGS_VMALLOC_MEM) &&
-		(memdesc->physaddr || !memdesc->hostptr))
-		ptr = (uint8_t *)memdesc->physaddr;
-	else if (memdesc->hostptr == NULL)
-		ptr = __va(memdesc->physaddr);
-	else
-		ptr = memdesc->hostptr;
-
-	if (memdesc->size <= (gpuaddr - memdesc->gpuaddr))
-		ptr = NULL;
-
-	*size = ptr ? (memdesc->size - (gpuaddr - memdesc->gpuaddr)) : 0;
-	return (uint8_t *)(ptr ? (ptr  + (gpuaddr - memdesc->gpuaddr)) : NULL);
-}
-
-uint8_t *kgsl_sharedmem_convertaddr(struct kgsl_device *device,
-	unsigned int pt_base, unsigned int gpuaddr, unsigned int *size)
-{
-	uint8_t *result = NULL;
+	struct kgsl_memdesc *result = NULL;
 	struct kgsl_mem_entry *entry;
 	struct kgsl_process_private *priv;
 	struct kgsl_yamato_device *yamato_device = KGSL_YAMATO_DEVICE(device);
 	struct kgsl_ringbuffer *ringbuffer = &yamato_device->ringbuffer;
 
-	if (kgsl_gpuaddr_in_memdesc(&ringbuffer->buffer_desc, gpuaddr)) {
-		return kgsl_gpuaddr_to_vaddr(&ringbuffer->buffer_desc,
-					gpuaddr, size);
-	}
-
-	if (kgsl_gpuaddr_in_memdesc(&ringbuffer->memptrs_desc, gpuaddr)) {
-		return kgsl_gpuaddr_to_vaddr(&ringbuffer->memptrs_desc,
-					gpuaddr, size);
-	}
-
-	if (kgsl_gpuaddr_in_memdesc(&device->memstore, gpuaddr)) {
-		return kgsl_gpuaddr_to_vaddr(&device->memstore,
-					gpuaddr, size);
-	}
+	if (kgsl_gpuaddr_in_memdesc(&ringbuffer->buffer_desc, gpuaddr, size))
+		return &ringbuffer->buffer_desc;
+	
+	if (kgsl_gpuaddr_in_memdesc(&ringbuffer->memptrs_desc, gpuaddr, size))
+		return &ringbuffer->memptrs_desc;
+	
+	if (kgsl_gpuaddr_in_memdesc(&device->memstore, gpuaddr, size))
+		return &device->memstore;
 
 	mutex_lock(&kgsl_driver.process_mutex);
 	list_for_each_entry(priv, &kgsl_driver.process_list, list) {
@@ -648,9 +624,8 @@ uint8_t *kgsl_sharedmem_convertaddr(struct kgsl_device *device,
 		spin_lock(&priv->mem_lock);
 		entry = kgsl_sharedmem_find_region(priv, gpuaddr,
 						sizeof(unsigned int));
-		if (entry) {
-			result = kgsl_gpuaddr_to_vaddr(&entry->memdesc,
-							gpuaddr, size);
+       	if (entry) {
+			result = &entry->memdesc;
 			spin_unlock(&priv->mem_lock);
 			mutex_unlock(&kgsl_driver.process_mutex);
 			return result;
@@ -661,14 +636,21 @@ uint8_t *kgsl_sharedmem_convertaddr(struct kgsl_device *device,
 
 	BUG_ON(!mutex_is_locked(&device->mutex));
 	list_for_each_entry(entry, &device->memqueue, list) {
-		if (kgsl_gpuaddr_in_memdesc(&entry->memdesc, gpuaddr)) {
-			result = kgsl_gpuaddr_to_vaddr(&entry->memdesc,
-							gpuaddr, size);
-			break;
-		}
-
+	if (kgsl_gpuaddr_in_memdesc(&entry->memdesc, gpuaddr, size)) {
+	     result = &entry->memdesc;
+	     break;
+	  }
 	}
 	return result;
+}
+
+uint8_t *adreno_convertaddr(struct kgsl_device *device, unsigned int pt_base,
+							   unsigned int gpuaddr, unsigned int size)
+{
+	const struct kgsl_memdesc *memdesc;
+	memdesc = adreno_find_region(device, pt_base, gpuaddr, size);
+	return memdesc ? kgsl_gpuaddr_to_vaddr(memdesc, gpuaddr) : NULL;
+	
 }
 
 /*call all ioctl sub functions with driver locked*/
@@ -1310,12 +1292,6 @@ static int kgsl_ioctl_map_user_mem(struct kgsl_process_private *private,
 
 		if (!param.len)
 			param.len = len;
-		else if (param.len != len) {
-			KGSL_DRV_ERR("param.len(%d) invalid for given host "
-				"address(%x)\n", param.len, param.hostptr);
-			result = -EINVAL;
-			goto error;
-		}
 		if (param.memtype == KGSL_USER_MEM_TYPE_ASHMEM) {
 			struct file *ashmem_vm_file;
 			if (get_ashmem_file(param.fd, &file_ptr,
@@ -1450,10 +1426,6 @@ kgsl_ioctl_sharedmem_flush_cache(struct kgsl_process_private *private,
 		KGSL_DRV_ERR("invalid gpuaddr %08x\n", param.gpuaddr);
 		result = -EINVAL;
 	} else {
-		if (!entry->memdesc.hostptr)
-			entry->memdesc.hostptr =
-				kgsl_gpuaddr_to_vaddr(&entry->memdesc,
-					param.gpuaddr, &entry->memdesc.size);
 
 		if (!entry->memdesc.hostptr) {
 			KGSL_DRV_ERR("invalid hostptr with gpuaddr %08x\n",

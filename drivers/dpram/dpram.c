@@ -74,6 +74,7 @@
 #include "../../arch/arm/mach-msm/smd_private.h"
 #include "../../arch/arm/mach-msm/proc_comm.h"
 
+
 #include <mach/parameters.h>
 #include <linux/spinlock.h>
 
@@ -130,7 +131,7 @@ static samsung_vendor1_id *p_smem_vendor1;
 #define READ_FROM_DPRAM(dest, src, size) \
 	_memcpy(dest, (void *)(SmemBase + src), size)
 
-#define NUM_PDP_CONTEXT			8
+#define NUM_PDP_CONTEXT                 6
 
 #ifdef _ENABLE_ERROR_DEVICE
 #define DPRAM_ERR_MSG_LEN			65
@@ -193,7 +194,7 @@ struct pdp_info {
 	union {
 		/* Virtual serial interface */
 		struct {
-			struct tty_driver	tty_driver[NUM_PDP_CONTEXT];	// CSD, CDMA, TRFB, CIQ
+			struct tty_driver	tty_driver[NUM_PDP_CONTEXT];	// CSD, CDMA,
 			int			refcount;
 			struct tty_struct	*tty_table[1];
 			struct ktermios		*termios[1];
@@ -281,6 +282,7 @@ static struct tty_struct *dpram_tty[MAX_INDEX];
 static struct ktermios *dpram_termios[MAX_INDEX];
 static struct ktermios *dpram_termios_locked[MAX_INDEX];
 
+
 // hsil
 extern void *smem_alloc(unsigned, unsigned);
 //extern void enable_dpram_pins(void);
@@ -359,7 +361,7 @@ struct workqueue_struct *dpram_work_queue;
 struct work_struct dpram_irq_work;
 static u16 request_command;
 
-#if defined(CONFIG_MACH_VITAL2)
+#if defined (CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 struct workqueue_struct *emmc_param_work_queue;
 struct work_struct emmc_param_read_access;
 struct work_struct emmc_param_write_access;
@@ -563,7 +565,7 @@ static int dpram_write(dpram_device_t *device,
 	u16 head, tail;
 	u16 irq_mask = 0;
 	unsigned long flags;
-	
+
 	if (dpram_debug_mask&DPRAM_DEBUG_WRITE) {
 		int i;
 
@@ -1843,7 +1845,7 @@ static void res_ack_tasklet_handler(unsigned long data)
 
 		wake_up_interruptible(&tty->write_wait);
 	}
-		
+
 }
 
 static void fmt_rcv_tasklet_handler(unsigned long data)
@@ -1894,7 +1896,7 @@ static void raw_rcv_tasklet_handler(unsigned long data)
 	u16 non_cmd = tasklet_data->non_cmd;
 
 	int ret = 0;
-	
+
 	while (dpram_get_read_available(device)) {
 		ret = dpram_read_raw(device, non_cmd);
 		if (ret < 0) {
@@ -2004,7 +2006,7 @@ static void cmd_chg_state_changed(void)
 		printk("[DPRAM:%s] changed irq: 0x%x detected.\n", __func__, value);
 	}
 
-} 
+}
 
 
 void command_handler(u16 cmd)
@@ -2121,7 +2123,8 @@ void check_int_pin_level(void)
 #endif
 }
 
-#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_CHIEF) || defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || \
+	defined(CONFIG_MACH_PREVAIL2)
 static void dpram_fake_irq_handler(unsigned long arg)
 {
 	check_miss_interrupt();
@@ -2507,6 +2510,7 @@ static int __devinit dpram_probe(struct platform_device *dev)
 	}
 	DPRAM_DPRINTK(DPRAM_DEBUG_INIT, KERN_INFO, "SmemBase = 0x%x\n", (unsigned int)SmemBase);
 
+
 #ifdef __SMEM_DPRAM_DEBUG__
    p_smem_vendor1 = (void *)((samsung_vendor1_id *)smem_alloc(SMEM_ID_VENDOR1, sizeof(samsung_vendor1_id)));
 #endif
@@ -2521,15 +2525,15 @@ static int __devinit dpram_probe(struct platform_device *dev)
 
    INIT_WORK(&dpram_irq_work, dpram_irq_work_queue);
 
-	#if defined(CONFIG_MACH_VITAL2)
-	emmc_param_work_queue = create_singlethread_workqueue("emmc_param");
+	#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
+ 	emmc_param_work_queue = create_singlethread_workqueue("emmc_param");
 	if (!emmc_param_work_queue)
 		return -ENOMEM;
 
 	INIT_WORK(&emmc_param_write_access, &emmc_write_param);
 	INIT_WORK(&emmc_param_read_access, &emmc_read_param);
 	#endif
-	 
+
 	/* @LDK@ register dpram (tty) driver */
 	retval = register_dpram_driver();
 
@@ -2670,7 +2674,7 @@ static int silent_write_proc_debug(struct file *file, const char *buffer,
 int dump_enable;
 size_t multi_download_mode;
 
-#if defined(CONFIG_MACH_VITAL2)
+#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 static void emmc_write_param(struct work_struct *work)
 {
 	struct samsung_parameter param_data;
@@ -2689,7 +2693,7 @@ static void emmc_read_param(struct work_struct *work)
 {
 	struct samsung_parameter param_data;
 	samsung_vendor1_id* smem_vendor1 = (samsung_vendor1_id *)smem_alloc(SMEM_ID_VENDOR1, sizeof(samsung_vendor1_id));
-	
+
 	memset(&param_data,0,sizeof(struct samsung_parameter));
 	emmc_kernel_param_read(&param_data);
 
@@ -2714,7 +2718,7 @@ static int dump_enable_read_proc_debug(char *page, char **start, off_t offset,
 	*eof = 1;
 
 	#if 0
-	static int test;	 
+	static int test;
 	if(test > 5)
 	{
 		msleep(6000);
@@ -2722,7 +2726,7 @@ static int dump_enable_read_proc_debug(char *page, char **start, off_t offset,
 	}
 	test ++;
 	#endif
-	
+
 	return sprintf(page, "%u\n", dump_enable);
 }
 
@@ -2755,7 +2759,7 @@ static int dump_enable_write_proc_debug(struct file *file, const char *buffer,
 		dump_enable = 2;
 		printk("Set silent : %d\n", dump_enable);
 	}else if(!strncmp(buf,"set_dump_level",count)){
-		#if defined(CONFIG_MACH_VITAL2)
+		#if defined(CONFIG_MACH_VITAL2) || defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 			printk(KERN_INFO "set_dump_level called\n");
 
 			#ifdef PRODUCT_SHIP
@@ -2808,7 +2812,7 @@ static int multi_download_read_proc_debug(char *page, char **start, off_t offset
 {
 	struct BOOT_PARAM *boot_param_data;
 	char string[20]="DOWNLOAD";
-	
+
 	#if 0
 		if ( !(boot_param_data = kzalloc(sizeof(struct BOOT_PARAM),GFP_KERNEL))) {
 			printk("######### can not alloc memory for read boot_param_data ! ##################\n");
@@ -2822,10 +2826,10 @@ static int multi_download_read_proc_debug(char *page, char **start, off_t offset
 	#else
 		if(multi_download_mode != 0xabcd1234)
 			memset(string,0,sizeof(string));
-		
+
 	#endif
 	*eof = 1;
-	
+
 	return sprintf(page, "%s\n", string);
 }
 
@@ -2865,7 +2869,7 @@ static int multi_download_write_proc_debug(struct file *file, const char *buffer
 
 		printk("%s %s multi_download_mode:%d \n",__func__,buf,multi_download_mode);
 	#endif
-	
+
 	kfree(buf);
 
 	return count;
@@ -2916,16 +2920,17 @@ static int __init dpram_init(void)
 	}
 	msm_read_param(param_data);
 
-	ram_dump_level_ent = create_proc_entry("ram_dump_level", 0644, NULL); 
+	ram_dump_level_ent = create_proc_entry("ram_dump_level", 0644, NULL);
 	ram_dump_level_ent->read_proc = dump_enable_read_proc_debug;
 	ram_dump_level_ent->write_proc = dump_enable_write_proc_debug;
 	ram_dump_level_ent->uid = 1001;//1001 is  AID_RADIO (#include <private/android_filesystem_config.h>)
 
 	#ifdef PRODUCT_SHIP
-		smem_vendor1->ram_dump_level = dump_enable = 0;
+		dump_enable = 0;
 	#else
-		dump_enable = 2;
-		#if defined(CONFIG_MACH_CHIEF)
+		dump_enable = smem_vendor1->ram_dump_level = 2;
+	#endif
+	#if defined(CONFIG_MACH_CHIEF)
 		if ( !(param_data = kzalloc(sizeof(struct samsung_parameter),GFP_KERNEL))) {
 			printk("######### can not alloc memory for param_data ! ##################\n");
 			 smem_vendor1->ram_dump_level = dump_enable;
@@ -2945,7 +2950,6 @@ static int __init dpram_init(void)
 			dump_enable=smem_vendor1->ram_dump_level = param_data->ram_dump_level;
 			kfree(param_data);
 		}
-		#endif
 	#endif
 
 	/*To support multi-download tool*/
@@ -3302,9 +3306,7 @@ static int multipdp_init(void)
 		{ .id = 8, .ifname = "ttyEFS" },
 		{ .id = 5, .ifname = "ttyGPS" },
 		{ .id = 6, .ifname = "ttyXTRA" },
-		{ .id = 9, .ifname = "ttyCIQ1" },
-		{ .id = 27, .ifname = "ttyCIQ0" },
-		{ .id = 29, .ifname = "ttyCPLOG" },		
+ 		{ .id = 29, .ifname = "ttyCPLOG" },
 	};
 
 	/* create serial device for Circuit Switched Data */

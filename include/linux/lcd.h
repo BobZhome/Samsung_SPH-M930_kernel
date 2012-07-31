@@ -111,7 +111,7 @@ static inline void * lcd_get_data(struct lcd_device *ld_dev)
 	return dev_get_drvdata(&ld_dev->dev);
 }
 
-#if defined (CONFIG_MACH_VITAL2)
+#if defined (CONFIG_MACH_VITAL2)|| defined (CONFIG_MACH_ROOKIE2) || defined(CONFIG_MACH_PREVAIL2)
 #define LCD_WAKEUP_PERFORMANCE	1
 
 int display_common_power(int on);

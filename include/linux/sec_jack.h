@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- */
+ */ 
 
 #ifndef __ASM_ARCH_SEC_HEADSET_H
 #define __ASM_ARCH_SEC_HEADSET_H
@@ -23,7 +23,10 @@
 #define MSM_GPIO_EAR_DET		((system_rev>=6)?142:160)
 #define MSM_GPIO_MICBIAS_EN		((system_rev>=6)?160:142)
 
-#elif CONFIG_MACH_VITAL2
+#elif CONFIG_MACH_VITAL2 || defined CONFIG_MACH_ROOKIE2
+#define MSM_GPIO_EAR_DET		((system_rev>=2)?142:160)
+#define MSM_GPIO_MICBIAS_EN		((system_rev>=2)?160:142)
+#elif CONFIG_MACH_PREVAIL2
 #define MSM_GPIO_EAR_DET		((system_rev>=2)?142:160)
 #define MSM_GPIO_MICBIAS_EN		((system_rev>=2)?160:142)
 #endif
